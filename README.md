@@ -1,6 +1,8 @@
 # Porous Equivariant Networks
 
-To train a network using our dataset, the following command should be called:
+Code for the paper: "Equivariant Crystal Networks for Porous Materials"
+
+To train a network using our models and dataset, the following command should be called:
 
 ```
 python code/train/train.py -i 0 -r 1 -m pore -p 1
