@@ -1,8 +1,8 @@
 import os
 import sys
 sys.path.append(os.getcwd())
-sys.path.insert(0, "../Zeolites/code/")
-sys.path.insert(0, "../Zeolites/")
+sys.path.insert(0, "../porousequivariantnetworks/code/")
+sys.path.insert(0, "../porousequivariantnetworks/")
 
 import pandas as pd
 import numpy as np
