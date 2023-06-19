@@ -1,6 +1,6 @@
 # Porous Equivariant Networks
 
-Code for the paper: "Equivariant Crystal Networks for Porous Materials"
+Code for the paper: "[Equivariant Crystal Networks for Porous Materials](https://arxiv.org/abs/2304.01628)"
 
 To train a network using our models and dataset, the following command should be called:
 
