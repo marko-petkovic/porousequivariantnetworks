@@ -504,27 +504,27 @@ def get_data_pore(atoms, hoa, edges, pore,edges_sp, edges_ps, bs=10, random=Fals
     # this way the distribution of HoA the model trains on is more uniform
     # in practice, the trainloader is oversampling lower and higer values
     # and undersampling values in the middle
-    weights = torch.zeros_like(_y_train)
+    # weights = torch.zeros_like(_y_train)
     
-    hist, bins = torch.histogram(_y_train)
+    # hist, bins = torch.histogram(_y_train)
     
-    for i in range(hist.shape[0]):
+    # for i in range(hist.shape[0]):
         
-        indices = ((bins[i] <= _y_train)*(_y_train < bins[i+1]))
-        weights[indices] = 1/(hist[i]**power)
+    #     indices = ((bins[i] <= _y_train)*(_y_train < bins[i+1]))
+    #     weights[indices] = 1/(hist[i]**power)
     
     
     
-    wrs = WeightedRandomSampler(weights, weights.shape[0])
+    # wrs = WeightedRandomSampler(weights, weights.shape[0])
     
     
-    trainloader = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, sampler=wrs)
+    #trainloader = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, sampler=wrs)
     testloader = DataLoader(ZeolitePoreDataset(_X_test, _X2, pore, edges_sp, edges_ps, _y_test), batch_size=bs, shuffle=False)
 
     # also create a trainloader without oversampling
     trainloader_raw = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, shuffle=True)
     
-    return trainloader, testloader, trainloader_raw
+    return None, testloader, trainloader_raw
 
 
 def get_data_megnet(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_lim=None, train_geq=False, power=.75, test_size=.10, p=1):
