@@ -348,7 +348,7 @@ class MPNN(nn.Module):
         self.message_steps = nn.Sequential(*message_steps)
         
         # create prediction layer
-        self.pred = PredictionLayer(self.site_pred, hid_size[-1], mlp_size, 1, self.perms, pool=pool)
+        self.pred = PredictionLayer(self.site_pred, hid_size[-1], mlp_size, out_size, self.perms, pool=pool)
         
         
     def forward(self, sites, bonds):
@@ -407,7 +407,8 @@ class MPNN(nn.Module):
                 sites, bonds, y = sites.float().to('cuda'), bonds.float().to('cuda'), y.float().to('cuda')
 
                 y_hat = self.forward(sites, bonds)
-                y_hat = y_hat.reshape(y_hat.shape[0])
+                y_hat = y_hat.squeeze()
+                #y_hat = y_hat.reshape(y_hat.shape[0])
                 loss = self.criterion(y_hat, y)
                 if scale_loss:
                     loss /= y
@@ -430,7 +431,8 @@ class MPNN(nn.Module):
                 with torch.no_grad():
                     sites, bonds, y = sites.float().to('cuda'), bonds.float().to('cuda'), y.float().to('cuda')
                     y_hat = self.forward(sites, bonds)
-                    y_hat = y_hat.reshape(y_hat.shape[0])
+                    y_hat = y_hat.squeeze()
+                    # y_hat = y_hat.reshape(y_hat.shape[0])
                     loss = self.criterion(y_hat, y)
                     if scale_loss:
                         loss /= y
@@ -503,7 +505,7 @@ class MPNNPORE(nn.Module):
         self.message_steps = nn.Sequential(*message_steps)
         
         # create prediction layer
-        self.pred = PredictionLayer(self.site_pred, hid_size[-1], mlp_size, 1, self.perms, pool=pool)
+        self.pred = PredictionLayer(self.site_pred, hid_size[-1], mlp_size, out_size, self.perms, pool=pool)
         
         
     def forward(self, sites, bonds, sites_p, bonds_sp, bonds_ps):
@@ -568,7 +570,8 @@ class MPNNPORE(nn.Module):
                 self.optimizer.zero_grad()
                 sites, bonds, sites_p, bonds_sp, bonds_ps, y = sites.float().to('cuda'), bonds.float().to('cuda'), sites_p.float().to('cuda'), bonds_sp.float().to('cuda'), bonds_ps.float().to('cuda'), y.float().to('cuda')
                 y_hat = self.forward(sites, bonds, sites_p, bonds_sp, bonds_ps)
-                y_hat = y_hat.reshape(y_hat.shape[0])
+                y_hat = y_hat.squeeze()
+                #y_hat = y_hat.reshape(y_hat.shape[0])
                 loss = self.criterion(y_hat, y)
                 if scale_loss:
                     loss /= y
@@ -591,7 +594,8 @@ class MPNNPORE(nn.Module):
                 with torch.no_grad():
                     sites, bonds, sites_p, bonds_sp, bonds_ps, y = sites.float().to('cuda'), bonds.float().to('cuda'), sites_p.float().to('cuda'), bonds_sp.float().to('cuda'), bonds_ps.float().to('cuda'), y.float().to('cuda')
                     y_hat = self.forward(sites, bonds, sites_p, bonds_sp, bonds_ps)
-                    y_hat = y_hat.reshape(y_hat.shape[0])
+                    y_hat = y_hat.squeeze()
+                    # y_hat = y_hat.reshape(y_hat.shape[0])
                     loss = self.criterion(y_hat, y)
                     if scale_loss:
                         loss /= y

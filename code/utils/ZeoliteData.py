@@ -456,7 +456,7 @@ def get_data_graph(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_lim
     return trainloader, testloader, trainloader_raw    
     
     
-def get_data_pore(atoms, hoa, edges, pore,edges_sp, edges_ps, bs=10, random=False, hoa_lim=None, sub_lim=None, train_geq=False, power=.75, test_size=.10, p=1):
+def get_data_pore(atoms, hoa, edges, pore,edges_sp, edges_ps, bs=10, random=False, hoa_lim=None, sub_lim=None, train_geq=False, power=.75, test_size=.10, p=1, drop_last=False):
     _X = torch.tensor(atoms).unsqueeze(-1)
     _X2 = edges
     _y = torch.tensor(hoa)
@@ -519,10 +519,10 @@ def get_data_pore(atoms, hoa, edges, pore,edges_sp, edges_ps, bs=10, random=Fals
     
     
     #trainloader = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, sampler=wrs)
-    testloader = DataLoader(ZeolitePoreDataset(_X_test, _X2, pore, edges_sp, edges_ps, _y_test), batch_size=bs, shuffle=False)
+    testloader = DataLoader(ZeolitePoreDataset(_X_test, _X2, pore, edges_sp, edges_ps, _y_test), batch_size=bs, shuffle=False, drop_last=drop_last)
 
     # also create a trainloader without oversampling
-    trainloader_raw = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, shuffle=True)
+    trainloader_raw = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, shuffle=True, drop_last=drop_last)
     
     return None, testloader, trainloader_raw
 
