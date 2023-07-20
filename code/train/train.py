@@ -30,9 +30,13 @@ if __name__ == "__main__":
     
     #parser.add_argument('-n', '--name', type=str)
     parser.add_argument('-m', '--model_type', choices=['pore', 'equi','megnet','cgcnn','schnet'], type=str)
-    parser.add_argument('-p', '--prop_train', type=float)
-    parser.add_argument('-r', '--repetitions', type=int)
-    parser.add_argument('-i', '--initial_repetition', type=int, default=1)
+    parser.add_argument('-z', '--zeolite', choices=['MOR', 'MFI'], type=str)
+    parser.add_argument('-p', '--prop_train', type=float, default=1.0)
+    parser.add_argument('-r', '--repetitions', type=int, default=1)
+    parser.add_argument('-i', '--initial_repetition', type=int, default=0)
+    parser.add_argument('-n', '--epochs', type=int, default=50)
+    parser.add_argument('-s', '--sub_lim', type=int, default=12)
+
     
     args = parser.parse_args()
     
@@ -45,21 +49,20 @@ if __name__ == "__main__":
         
         model_name = f'model_{i+1+args.initial_repetition}'
         
-        data_dir = f'model_data/{args.prop_train}/{args.model_type}/{model_name}/'
+        data_dir = f'model_data/{args.zeolite}/{args.prop_train}/{args.model_type}/{model_name}/'
 
         os.makedirs(data_dir)
 
         print('started!')
 
 
-        data = get_zeolite('MOR')
+        data = get_zeolite(args.zeolite, sym=True)
 
         ref = data['ref'] # reflections
         tra = data['tra'] # translations
         l = data['l'] # scale of the unit cell
 
-        # specific for MOR
-        atoms, hoa, X, A, d, X_pore, A_pore, d_pore, pore = get_data(l)
+        atoms, hoa, X, A, d, X_pore, A_pore, d_pore, pore = get_data(l, args.zeolite)
 
         edges, idx1, idx2, idx2_oh = get_graph_data(A, d)
 
@@ -82,14 +85,14 @@ if __name__ == "__main__":
                             centers=10, mx_d=6, width=1, pool='sum').to('cuda')
 
 
-            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=12, p=args.prop_train)
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
 
         elif args.model_type == 'megnet':
 
             mpnn = MEGNet(idx1.to('cuda'), idx2.to('cuda')).to('cuda')
 
 
-            _, testloader, trainloader = get_data_megnet(atoms, hoa, edges, bs=32, sub_lim=12, p=args.prop_train)
+            _, testloader, trainloader = get_data_megnet(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
 
         
         elif args.model_type == 'cgcnn':
@@ -97,7 +100,7 @@ if __name__ == "__main__":
             mpnn = CGCNN(idx1.to('cuda'), idx2.to('cuda')).to('cuda')
 
 
-            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=12, p=args.prop_train)
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
             
         
         elif args.model_type == 'schnet':
@@ -105,10 +108,10 @@ if __name__ == "__main__":
             mpnn = SchNet(d).to('cuda')
 
             
-            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=12, p=args.prop_train)
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
 
         print('starting fitting!')
-        trainloss, testloss = mpnn.fit(trainloader, testloader, 200, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':0.001}, crit_kwargs={'delta':1.0})
+        trainloss, testloss = mpnn.fit(trainloader, testloader, args.epochs, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':0.001}, crit_kwargs={'delta':1.0})
 
 
         print('done fitting!')
