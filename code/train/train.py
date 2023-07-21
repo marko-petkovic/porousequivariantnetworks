@@ -76,7 +76,7 @@ if __name__ == "__main__":
                             idx1_ps.to('cuda'), idx2_ps.to('cuda'), idx2_oh_ps.to('cuda'),
                             hid_size=[8]*6, site_emb_size=8, edge_emb_size=8, mlp_size=24,
                             centers=10, mx_d=6, width=1, pool='sum').to('cuda')
-            _, testloader, trainloader = get_data_pore(atoms, hoa, edges, pore, edges_sp, edges_ps, bs=32, sub_lim=12, p=args.prop_train)
+            _, testloader, trainloader = get_data_pore(atoms, hoa, edges, pore, edges_sp, edges_ps, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
 
         elif args.model_type == 'equi':
 
