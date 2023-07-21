@@ -1,0 +1,46 @@
+set encoding utf8
+set xlabel 'Pressure, {/Helvetica-Italic p} / [Pa]' font "Helvetica,18"
+set ylabel 'Absolute loading, {/Helvetica-Italic q} / [mol/kg]' offset 0.0,0 font "Helvetica,18"
+set bmargin 4
+set yrange[0:]
+set log x
+set key  right bottom vertical samplen 2.5 height 0.5 spacing 1.5 font 'Helvetica, 10'
+set key title 'CO2'
+set output 'isotherms_fit_CO2.pdf'
+set term pdf color solid
+set linetype 1 pt 5 ps 0.5 lw 2 lc rgb '0xee0000'
+set linetype 2 pt 7 ps 0.5 lw 2 lc rgb '0x008b00'
+set linetype 3 pt 9 ps 0.5 lw 2 lc rgb '0x0000cd'
+set linetype 4 pt 11 ps 0.5 lw 2 lc rgb '0xff3fb3'
+set linetype 5 pt 13 ps 0.5 lw 2 lc rgb '0x00cdcd'
+set linetype 6 pt 15 ps 0.5 lw 2 lc rgb '0xcd9b1d'
+set linetype 7 pt  4 ps 0.5 lw 2 lc rgb '0x8968ed'
+set linetype 8 pt  6 ps 0.5 lw 2 lc rgb '0x8b8b83'
+set linetype 9 pt  8 ps 0.5 lw 2 lc rgb '0x00bb00'
+set linetype 10 pt 10 ps 0.5 lw 2 lc rgb '0x1e90ff'
+set linetype 11 pt 12 ps 0.5 lw 2 lc rgb '0x8b2500'
+set linetype 12 pt 14 ps 0.5 lw 2 lc rgb '0x000000'
+array s[9]
+s[1]=0.129723
+s[2]=175.093
+s[3]=1.34679
+s[4]=1.54941
+s[5]=1.37126
+s[6]=0.169103
+s[7]=0
+s[8]=0
+s[9]=0
+array p[9]
+p[1]=1.86323
+p[2]=0.000985602
+p[3]=0.715334
+p[4]=1.38621
+p[5]=3.6782e-05
+p[6]=0.764173
+p[7]=-0.0222259
+p[8]=-0.258018
+p[9]=-0.181423
+plot \
+s[1]*s[2]*x**s[3]/(1.0+s[2]*x**s[3])+s[4]*s[5]*x**s[6]/(1.0+s[5]*x**s[6]) title 'start f(x)' with li dt 2 lw 2,\
+p[1]*p[2]*x**p[3]/(1.0+p[2]*x**p[3])+p[4]*p[5]*x**p[6]/(1.0+p[5]*x**p[6]) title 'fit f(x)' with li lw 2,\
+'CO2-MOR-413.load' us 1:2 title 'raw data' with po pt 5 ps 0.5
