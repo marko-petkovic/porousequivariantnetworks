@@ -478,10 +478,12 @@ class MPNNPORE(nn.Module):
                  site_emb_size=16, edge_emb_size=12, hid_size=[16,16,32],
                  mlp_size=32, out_size=1, site_pred=False,
                  width=1, mx_d=10, mn_d=0, centers=10,
-                 pool='none'):
+                 pool='none', add_p=False):
         
         super().__init__()
-        
+
+        self.add_p = add_p
+                     
         # get permutation group
         self.perms = self.get_perms(X, ref, tra)
         self.perms_p = self.get_perms(X_p, ref, tra)
@@ -490,10 +492,10 @@ class MPNNPORE(nn.Module):
         self.gaussian_kwargs = dict(max_distance=mx_d, num_centers=centers, width=width, min_distance=mn_d)
         
         # embedding layer for nodes and edges
-        self.site_emb = EmbeddingLayer(1, site_emb_size)
+        self.site_emb = EmbeddingLayer(1+1*add_p, site_emb_size)
         self.edge_emb = EmbeddingLayer(centers, edge_emb_size)
         
-        self.site_emb_p = EmbeddingLayer(2, site_emb_size)
+        self.site_emb_p = EmbeddingLayer(2+1*add_p, site_emb_size)
         self.edge_emb_p = EmbeddingLayer(centers, edge_emb_size)
         
         # create message passing layers
@@ -508,7 +510,13 @@ class MPNNPORE(nn.Module):
         self.pred = PredictionLayer(self.site_pred, hid_size[-1], mlp_size, out_size, self.perms, pool=pool)
         
         
-    def forward(self, sites, bonds, sites_p, bonds_sp, bonds_ps):
+    def forward(self, sites, bonds, sites_p, bonds_sp, bonds_ps, p=None):
+
+        if p is not None:
+
+            sites = torch.cat([sites, p], -1)
+            sites_p = torch.cat([sites_p, p], -1)
+        
         # gaussian embedding of distance
         bonds = gaussian_basis(bonds, **self.gaussian_kwargs)
         bonds_sp = gaussian_basis(bonds_sp, **self.gaussian_kwargs)
