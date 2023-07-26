@@ -36,6 +36,7 @@ if __name__ == "__main__":
     parser.add_argument('-i', '--initial_repetition', type=int, default=0)
     parser.add_argument('-n', '--epochs', type=int, default=50)
     parser.add_argument('-s', '--sub_lim', type=int, default=12)
+    parser.add_argument('-a', '--aggregate_pore', type=bool, default=False)
 
     
     args = parser.parse_args()
@@ -75,7 +76,7 @@ if __name__ == "__main__":
                             idx1_sp.to('cuda'), idx2_sp.to('cuda'), idx2_oh_sp.to('cuda'), 
                             idx1_ps.to('cuda'), idx2_ps.to('cuda'), idx2_oh_ps.to('cuda'),
                             hid_size=[8]*6, site_emb_size=8, edge_emb_size=8, mlp_size=24,
-                            centers=10, mx_d=6, width=1, pool='sum').to('cuda')
+                            centers=10, mx_d=6, width=1, pool='sum', pool_pore=args.aggregate_pore).to('cuda')
             _, testloader, trainloader = get_data_pore(atoms, hoa, edges, pore, edges_sp, edges_ps, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
 
         elif args.model_type == 'equi':
