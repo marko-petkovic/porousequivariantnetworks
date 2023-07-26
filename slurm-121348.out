@@ -1,0 +1,4 @@
+started repetition 0
+started!
+starting fitting!
+  0%|          | 0/200 [00:00<?, ?epoch/s, loss]  0%|          | 1/200 [00:26<1:28:00, 26.53s/epoch, loss: 5.709 test loss: 7.020]  1%|          | 2/200 [00:52<1:26:35, 26.24s/epoch, loss: 4.723 test loss: 9.776]  2%|▏         | 3/200 [01:18<1:26:04, 26.22s/epoch, loss: 4.560 test loss: 9.239]  2%|▏         | 4/200 [01:44<1:25:40, 26.23s/epoch, loss: 3.676 test loss: 3.991]  2%|▎         | 5/200 [02:11<1:26:02, 26.47s/epoch, loss: 2.524 test loss: 3.593]
