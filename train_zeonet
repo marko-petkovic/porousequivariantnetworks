@@ -1,5 +1,5 @@
 #!/bin/bash
 source /home/TUE/20175552/miniconda3/etc/profile.d/conda.sh
 source activate torch2
-python code/train/train.py -m pore -z MOR -n 200 -s 12 -i 0 -r 10 -a True
+python code/train/train.py -m equi -z MOR -n 200 -s 12 -i 0 -r 10 -a True
 source deactivate
