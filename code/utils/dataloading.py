@@ -169,6 +169,9 @@ def get_MOR_pore(X, l):
         pore_pts = X[idxes]
 
         offset = [0, 0, 0]
+        if i in [14,15]:
+            offset = [0.5, 0, 0]
+            
         pore_pts = np.mod(pore_pts + offset, 1)
         pore_x = np.mod(np.mean(pore_pts,0) - offset, 1)
 
