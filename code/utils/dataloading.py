@@ -48,15 +48,15 @@ def get_pore(X, A_pore, l, zeo='MOR'):
 
 def get_data(l, zeo='MOR'):
     
-    atoms = np.load(f'data/{zeo}/atoms.npy').astype(int)
-    hoa = np.load(f'data/{zeo}/hoa.npy')
+    atoms = np.load(f'Data/{zeo}/atoms.npy').astype(int)
+    hoa = np.load(f'Data/{zeo}/hoa.npy')
     
-    X = np.load(f'data/{zeo}/X.npy')
+    X = np.load(f'Data/{zeo}/X.npy')
 
     if zeo =='MOR':
-        A = pd.read_csv(f'data/{zeo}/adj.txt', header=None, sep=' ').values[:,:-1]
+        A = pd.read_csv(f'Data/{zeo}/adj.txt', header=None, sep=' ').values[:,:-1]
     else:
-        A = np.load(f'data/{zeo}/adj.npy')
+        A = np.load(f'Data/{zeo}/adj.npy')
         # A_pore = pd.read_csv('data/adj_pore.csv', header=None, sep=';').values
     
     X_pore, A_pore = get_pore_X(X, l, zeo)

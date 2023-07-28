@@ -478,11 +478,12 @@ class MPNNPORE(nn.Module):
                  site_emb_size=16, edge_emb_size=12, hid_size=[16,16,32],
                  mlp_size=32, out_size=1, site_pred=False,
                  width=1, mx_d=10, mn_d=0, centers=10,
-                 pool='none', add_p=False):
+                 pool='none', add_p=False, pool_pore=False):
         
         super().__init__()
 
         self.add_p = add_p
+        self.pool_pore = pool_pore
                      
         # get permutation group
         self.perms = self.get_perms(X, ref, tra)
@@ -535,7 +536,10 @@ class MPNNPORE(nn.Module):
         sites, _, sites_p, _, _ = self.message_steps((sites, bonds, sites_p, bonds_sp, bonds_ps))
         
         # perform prediction
-        pred = self.pred(sites)
+        if self.pool_pore:
+           pred = self.pred(sites_p)
+        else:
+           pred = self.pred(sites)
         
         return pred
         
