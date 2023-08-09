@@ -14,6 +14,59 @@ from scipy.spatial import ConvexHull
 
 from utils.ZeoliteData import get_zeolite, apply_symmetry
 
+from torch_geometric.typing import OptTensor, SparseTensor
+
+
+def periodic_boundary(d):
+    '''
+    applies periodic boundary condition to distance d
+    '''
+    
+    d = torch.where(d<-0.5, d+1, d)
+    d = torch.where(d>0.5, d-1, d)
+    
+    return d
+
+def triplets(idx1, idx2, pos, l):
+    
+    num_nodes=len(pos)
+    
+    
+    row, col = idx1, idx2  # j->i
+
+    value = torch.arange(row.size(0), device=row.device)
+    adj_t = SparseTensor(row=col, col=row, value=value,
+                         sparse_sizes=(num_nodes, num_nodes))
+    adj_t_row = adj_t[row]
+    num_triplets = adj_t_row.set_value(None).sum(dim=1).to(torch.long)
+
+    # Node indices (k->j->i) for triplets.
+    idx_i = col.repeat_interleave(num_triplets)
+    idx_j = row.repeat_interleave(num_triplets)
+    idx_k = adj_t_row.storage.col()
+    mask = idx_i != idx_k  # Remove i == k triplets.
+    idx_i, idx_j, idx_k = idx_i[mask], idx_j[mask], idx_k[mask]
+
+    # Edge indices (k-j, j->i) for triplets.
+    idx_kj = adj_t_row.storage.value()[mask]
+    idx_ji = adj_t_row.storage.row()[mask]
+
+    
+    pos_ji = pos[idx_j] - pos[idx_i]
+    pos_kj = pos[idx_k] - pos[idx_j]
+    
+    # fix periodic boundary and multiply by scale
+    
+    pos_ji = periodic_boundary(pos_ji)*l
+    pos_kj = periodic_boundary(pos_kj)*l
+    
+    a = (pos_ji * pos_kj).sum(dim=-1)
+    b = torch.cross(pos_ji, pos_kj).norm(dim=-1)
+    angle = torch.atan2(b, a)
+    
+    dist = periodic_boundary(pos[col] - pos[row]).pow(2).sum(dim=-1).sqrt()
+    
+    return col, row, idx_kj, idx_ji, angle, dist
 
 
 def get_pore(X, A_pore, l, zeo='MOR'):
@@ -401,6 +454,9 @@ def get_distance_matrix(X1,X2,l):
             d[i,j] = get_distance(X1[i], X2[j],l)
 
     return d
+
+
+
 
 
 def get_graph_data(A, d):

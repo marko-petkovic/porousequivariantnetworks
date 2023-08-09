@@ -7,8 +7,6 @@ from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from sklearn.model_selection import train_test_split
 
 
-
-
 zeolite_dict = {'MFI':
                {
                    'ref': 
@@ -93,38 +91,7 @@ zeolite_dict = {'MFI':
                 'MOR':
                 {
                     'ref':
-                    # np.array([
-                    #     [1,1,1],
-                    #     [1,1,1],
-                    #     [-1,1,1],
-                    #     [-1,1,1],
-                    #     [1,-1,1],
-                    #     [1,-1,1],
-                    #     [-1,-1,1],
-                    #     [-1,-1,1],
-                    #     [-1,-1,-1],
-                    #     [-1,-1,-1],
-                    #     [1,-1,-1],
-                    #     [1,-1,-1],
-                    #     [-1,1,-1],
-                    #     [-1,1,-1],
-                    #     [1,1,-1],
-                    #     [1,1,-1]
-                    # ]),
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
+                   
                     np.array([
                         [1,1,1],
                         [-1,-1,1],
@@ -145,24 +112,7 @@ zeolite_dict = {'MFI':
                     ]),
                     
                     'tra':
-                    # np.array([
-                    #     [0,0,0],
-                    #     [.5,.5,0],
-                    #     [0,0,0],
-                    #     [.5,.5,0],
-                    #     [0,0,.5],
-                    #     [.5,.5,.5],
-                    #     [0,0,.5],
-                    #     [.5,.5,.5],
-                    #     [0,0,0],
-                    #     [.5,.5,0],
-                    #     [0,0,0],
-                    #     [.5,.5,0],
-                    #     [0,0,.5],
-                    #     [.5,.5,.5],
-                    #     [0,0,.5],
-                    #     [.5,.5,.5]
-                    # ]),
+
                                
                     
                     np.array([
@@ -187,12 +137,7 @@ zeolite_dict = {'MFI':
                     'l':np.array([18.256,20.534,7.5420]),
                     
                     'X':
-                    # np.array([
-                    #     [.3057, .0736, .0435],
-                    #     [.3028, .3106, .0437],
-                    #     [.0848, .3791, .2500],
-                    #     [.0848, .2227, .2500]
-                    # ]),
+
                     np.array([
                         [.3057, .0736, .0435],
                         [.3028, .3106, .0437],
@@ -596,3 +541,4 @@ def get_data_megnet(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_li
     trainloader_raw = DataLoader(ZeoliteMegDataset(_X_train, _X2, _y_train), batch_size=bs, shuffle=True)
     
     return trainloader, testloader, trainloader_raw
+

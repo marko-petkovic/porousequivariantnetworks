@@ -1,9 +1,25 @@
 import torch
 import torch.nn as nn
 
-import numpy
+from torch.nn import Embedding, Linear
 
+from math import pi as PI
+from math import sqrt
+
+from tqdm import tqdm
+
+from torch import Tensor
+
+import torch.optim as optim
+
+import numpy as np
+
+from torch_geometric.nn.inits import glorot_orthogonal
+from torch_geometric.nn.resolver import activation_resolver
+from torch_geometric.typing import OptTensor, SparseTensor
 from torch_geometric.utils import scatter
+
+from utils.dataloading import triplets
 
 class Envelope(nn.Module):
     def __init__(self, exponent):
@@ -21,14 +37,14 @@ class Envelope(nn.Module):
         return (1.0 / x + a * x_pow_p0 + b * x_pow_p1 +
                 c * x_pow_p2) * (x < 1.0).to(x.dtype)
 
-class BesselBasisLayer(torch.nn.Module):
+class BesselBasisLayer(nn.Module):
     def __init__(self, num_radial, cutoff = 5.0,
-                 envelope_exponent5):
+                 envelope_exponent=5):
         super().__init__()
         self.cutoff = cutoff
         self.envelope = Envelope(envelope_exponent)
 
-        self.freq = torch.nn.Parameter(torch.empty(num_radial))
+        self.freq = nn.Parameter(torch.empty(num_radial))
 
         self.reset_parameters()
 
@@ -38,10 +54,11 @@ class BesselBasisLayer(torch.nn.Module):
         self.freq.requires_grad_()
 
     def forward(self, dist):
+        #dist = dist/self.cutoff
         dist = dist.unsqueeze(-1) / self.cutoff
         return self.envelope(dist) * (self.freq * dist).sin()
 
-class SphericalBasisLayer(torch.nn.Module):
+class SphericalBasisLayer(nn.Module):
     def __init__(
         self,
         num_spherical: int,
@@ -85,19 +102,20 @@ class SphericalBasisLayer(torch.nn.Module):
         dist = dist / self.cutoff
         rbf = torch.stack([f(dist) for f in self.bessel_funcs], dim=1)
         rbf = self.envelope(dist).unsqueeze(-1) * rbf
-
         cbf = torch.stack([f(angle) for f in self.sph_funcs], dim=1)
-
         n, k = self.num_spherical, self.num_radial
-        out = (rbf[idx_kj].view(-1, n, k) * cbf.view(-1, n, 1)).view(-1, n * k)
+        
+        rbf = rbf[idx_kj]
+        
+        out = (rbf.view(-1, n, k) * cbf.view(-1, n, 1)).view(-1, n * k)
         return out
 
 class EmbeddingBlock(torch.nn.Module):
-    def __init__(self, num_radial: int, hidden_channels: int, act:
+    def __init__(self, num_radial: int, hidden_channels: int, act):
         super().__init__()
         self.act = act
 
-        self.emb = nn.Embedding(95, hidden_channels)
+        self.emb = nn.Linear(1, hidden_channels)
         self.lin_rbf = nn.Linear(num_radial, hidden_channels)
         self.lin = nn.Linear(3 * hidden_channels, hidden_channels)
 
@@ -111,7 +129,7 @@ class EmbeddingBlock(torch.nn.Module):
     def forward(self, x: Tensor, rbf: Tensor, i: Tensor, j: Tensor) -> Tensor:
         x = self.emb(x)
         rbf = self.act(self.lin_rbf(rbf))
-        return self.act(self.lin(torch.cat([x[i], x[j], rbf], dim=-1)))
+        return self.act(self.lin(torch.cat([x[:,i], x[:,j], rbf], dim=-1)))
 
 
 class ResidualLayer(torch.nn.Module):
@@ -143,7 +161,7 @@ class InteractionPPBlock(torch.nn.Module):
         num_radial: int,
         num_before_skip: int,
         num_after_skip: int,
-        act: Callable,
+        act,
     ):
         super().__init__()
         self.act = act
@@ -213,12 +231,11 @@ class InteractionPPBlock(torch.nn.Module):
         # Transform via 2D spherical basis:
         sbf = self.lin_sbf1(sbf)
         sbf = self.lin_sbf2(sbf)
-        x_kj = x_kj[idx_kj] * sbf
+        x_kj = x_kj[:,idx_kj] * sbf
 
         # Aggregate interactions and up-project embeddings:
-        x_kj = scatter(x_kj, idx_ji, dim=0, dim_size=x.size(0), reduce='sum')
+        x_kj = scatter(x_kj, idx_ji, dim=1, dim_size=x.size(1), reduce='sum')
         x_kj = self.act(self.lin_up(x_kj))
-
         h = x_ji + x_kj
         for layer in self.layers_before_skip:
             h = layer(h)
@@ -236,7 +253,7 @@ class OutputPPBlock(torch.nn.Module):
         out_emb_channels: int,
         out_channels: int,
         num_layers: int,
-        act: Callable,
+        act,
         output_initializer: str = 'zeros',
     ):
         assert output_initializer in {'zeros', 'glorot_orthogonal'}
@@ -269,43 +286,19 @@ class OutputPPBlock(torch.nn.Module):
             glorot_orthogonal(self.lin.weight, scale=2.0)
 
     def forward(self, x: Tensor, rbf: Tensor, i: Tensor,
-                num_nodes: Optional[int] = None) -> Tensor:
+                num_nodes = None) -> Tensor:
         x = self.lin_rbf(rbf) * x
-        x = scatter(x, i, dim=0, dim_size=num_nodes, reduce='sum')
+        x = scatter(x, i, dim=1, dim_size=num_nodes, reduce='sum')
         x = self.lin_up(x)
         for lin in self.lins:
             x = self.act(lin(x))
         return self.lin(x)
 
 
-def triplets(
-    edge_index: Tensor,
-    num_nodes: int,
-) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
-    row, col = edge_index  # j->i
-
-    value = torch.arange(row.size(0), device=row.device)
-    adj_t = SparseTensor(row=col, col=row, value=value,
-                         sparse_sizes=(num_nodes, num_nodes))
-    adj_t_row = adj_t[row]
-    num_triplets = adj_t_row.set_value(None).sum(dim=1).to(torch.long)
-
-    # Node indices (k->j->i) for triplets.
-    idx_i = col.repeat_interleave(num_triplets)
-    idx_j = row.repeat_interleave(num_triplets)
-    idx_k = adj_t_row.storage.col()
-    mask = idx_i != idx_k  # Remove i == k triplets.
-    idx_i, idx_j, idx_k = idx_i[mask], idx_j[mask], idx_k[mask]
-
-    # Edge indices (k-j, j->i) for triplets.
-    idx_kj = adj_t_row.storage.value()[mask]
-    idx_ji = adj_t_row.storage.row()[mask]
-
-    return col, row, idx_i, idx_j, idx_k, idx_kj, idx_ji
 
 
 
-class DimeNetPlusPlus(DimeNet):
+class DimeNetPlusPlus(nn.Module):
     r"""The DimeNet++ from the `"Fast and Uncertainty-Aware
     Directional Message Passing for Non-Equilibrium Molecules"
     <https://arxiv.org/abs/2011.14115>`_ paper.
@@ -347,47 +340,47 @@ class DimeNetPlusPlus(DimeNet):
 
     def __init__(
         self,
-        hidden_channels: int,
-        out_channels: int,
-        num_blocks: int,
-        int_emb_size: int,
-        basis_emb_size: int,
-        out_emb_channels: int,
-        num_spherical: int,
-        num_radial: int,
+        idx1,
+        idx2,
+        pos,
+        l,
+        hidden_channels: int = 8,
+        out_channels: int = 1,
+        num_blocks: int = 6,
+        int_emb_size: int = 8,
+        basis_emb_size: int = 8,
+        out_emb_channels: int = 8,
+        num_spherical: int = 7,
+        num_radial: int = 6,
         cutoff: float = 5.0,
-        max_num_neighbors: int = 32,
         envelope_exponent: int = 5,
         num_before_skip: int = 1,
         num_after_skip: int = 2,
         num_output_layers: int = 3,
-        act: Union[str, Callable] = 'swish',
+        act = 'swish',
         output_initializer: str = 'zeros',
     ):
+        super().__init__()
+        
+        i, j, idx_kj, idx_ji, angle, dist = triplets(idx1, idx2, pos, l)
+        
+        self.i = i.long().cuda()
+        self.j = j.long().cuda()
+        self.idx_kj = idx_kj.long().cuda()
+        self.idx_ji = idx_ji.long().cuda()
+        self.angle = angle.float().cuda()
+        self.dist = dist.float().cuda()
+        
         act = activation_resolver(act)
 
-        super().__init__(
-            hidden_channels=hidden_channels,
-            out_channels=out_channels,
-            num_blocks=num_blocks,
-            num_bilinear=1,
-            num_spherical=num_spherical,
-            num_radial=num_radial,
-            cutoff=cutoff,
-            max_num_neighbors=max_num_neighbors,
-            envelope_exponent=envelope_exponent,
-            num_before_skip=num_before_skip,
-            num_after_skip=num_after_skip,
-            num_output_layers=num_output_layers,
-            act=act,
-            output_initializer=output_initializer,
-        )
+        self.cutoff = cutoff
+        self.num_blocks = num_blocks
 
-        # We are re-using the RBF, SBF and embedding layers of `DimeNet` and
-        # redefine output_block and interaction_block in DimeNet++.
-        # Hence, it is to be noted that in the above initalization, the
-        # variable `num_bilinear` does not have any purpose as it is used
-        # solely in the `OutputBlock` of DimeNet:
+        self.rbf = BesselBasisLayer(num_radial, cutoff, envelope_exponent)
+        self.sbf = SphericalBasisLayer(num_spherical, num_radial, cutoff,
+                                       envelope_exponent)
+
+        self.emb = EmbeddingBlock(num_radial, hidden_channels, act)
         self.output_blocks = torch.nn.ModuleList([
             OutputPPBlock(
                 num_radial,
@@ -415,123 +408,124 @@ class DimeNetPlusPlus(DimeNet):
 
         self.reset_parameters()
 
-[docs]    @classmethod
-    def from_qm9_pretrained(
-        cls,
-        root: str,
-        dataset: Dataset,
-        target: int,
-    ) -> Tuple['DimeNetPlusPlus', Dataset, Dataset,
-               Dataset]:  # pragma: no cover
-        r"""Returns a pre-trained :class:`DimeNetPlusPlus` model on the
-        :class:`~torch_geometric.datasets.QM9` dataset, trained on the
-        specified target :obj:`target`."""
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-        import tensorflow as tf
+                 
+    def reset_parameters(self):
+        r"""Resets all learnable parameters of the module."""
+        self.rbf.reset_parameters()
+        self.emb.reset_parameters()
+        for out in self.output_blocks:
+            out.reset_parameters()
+        for interaction in self.interaction_blocks:
+            interaction.reset_parameters()
+                 
+                 
+    def forward(self, z) :
+         
+        bs, num_nodes = z.shape[:2]
+        
+        dist = self.dist.clone()
+        angle = self.angle.clone()
+        
+        rbf = self.rbf(dist)[None].repeat(bs, 1, 1)
+        sbf = self.sbf(dist, angle, self.idx_ji)[None].repeat(bs, 1, 1)
 
-        assert target >= 0 and target <= 12 and not target == 4
+        # Embedding block.
+        x = self.emb(z, rbf, self.i, self.j)
+        P = self.output_blocks[0](x, rbf, self.i, num_nodes=num_nodes)
 
-        root = osp.expanduser(osp.normpath(root))
-        path = osp.join(root, 'pretrained_dimenet_pp', qm9_target_dict[target])
+        # Interaction blocks.
+        for interaction_block, output_block in zip(self.interaction_blocks,
+                                                   self.output_blocks[1:]):
+            x = interaction_block(x, rbf, sbf, self.idx_kj, self.idx_ji)
+            P = P + output_block(x, rbf, self.i, num_nodes=num_nodes)
 
-        makedirs(path)
-        url = f'{cls.url}/{qm9_target_dict[target]}'
+        return P.sum(dim=1)
+                 
+                 
+    def fit(self, trainloader, testloader, epochs, crit=nn.HuberLoss, crit_kwargs={'delta':1}, opt=optim.Adam, opt_kwargs={'lr':0.001}, scale_loss=True):
+        
+        if scale_loss:
+            crit_kwargs['reduction'] = 'none'
+        
+        # defines optimizer + loss criterion
+        self.optimizer = opt(params=self.parameters(), **opt_kwargs)
+        self.criterion = crit(**crit_kwargs)
+        
+        train_loss = []
+        test_loss = []
+        
+        pbar = tqdm(range(epochs), unit='epoch', postfix='loss', position=0, leave=True)
+        for e in pbar:
+            self.train()
+            for idx, (sites,_,y) in enumerate(trainloader):
+                
+                # model breaks for batch size 1
+                if sites.shape[0] == 1:
+                    continue
+                
+                self.optimizer.zero_grad()
+                sites = sites.float().to('cuda')
+                y = y.float().to('cuda')
+                
+                y_hat = self.forward(sites)
+                y_hat = y_hat.reshape(y_hat.shape[0])
+                loss = self.criterion(y_hat, y)
+                if scale_loss:
+                    loss /= y
+                loss = loss.mean()
+                loss.backward()
+                self.optimizer.step()
 
-        if not osp.exists(osp.join(path, 'checkpoint')):
-            download_url(f'{url}/checkpoint', path)
-            download_url(f'{url}/ckpt.data-00000-of-00002', path)
-            download_url(f'{url}/ckpt.data-00001-of-00002', path)
-            download_url(f'{url}/ckpt.index', path)
+                train_loss.append(loss.item())
 
-        path = osp.join(path, 'ckpt')
-        reader = tf.train.load_checkpoint(path)
+        
+            self.eval()
 
-        # Configuration from DimeNet++:
-        # https://github.com/gasteigerjo/dimenet/blob/master/config_pp.yaml
-        model = cls(
-            hidden_channels=128,
-            out_channels=1,
-            num_blocks=4,
-            int_emb_size=64,
-            basis_emb_size=8,
-            out_emb_channels=256,
-            num_spherical=7,
-            num_radial=6,
-            cutoff=5.0,
-            max_num_neighbors=32,
-            envelope_exponent=5,
-            num_before_skip=1,
-            num_after_skip=2,
-            num_output_layers=3,
-        )
+            for idx, (sites,_,y) in enumerate(testloader):
+                
+                
+                # model breaks for batch size 1
+                if sites.shape[0] == 1:
+                    continue
+                
+                with torch.no_grad():
+                    sites = sites.float().to('cuda')
+                    y = y.float().to('cuda')
+                    y_hat = self.forward(sites)
+                    y_hat = y_hat.reshape(y_hat.shape[0])
+                    loss = self.criterion(y_hat, y)
+                    if scale_loss:
+                        loss /= y
+                    loss = loss.mean()
+                    test_loss.append(loss.item())
+            pbar.postfix = f'loss: {np.mean(train_loss[-len(trainloader)+1:]):.3f} test loss: {np.mean(test_loss[-len(testloader)+1:]):.3f}'
 
-        def copy_(src, name, transpose=False):
-            init = reader.get_tensor(f'{name}/.ATTRIBUTES/VARIABLE_VALUE')
-            init = torch.from_numpy(init)
-            if name[-6:] == 'kernel':
-                init = init.t()
-            src.data.copy_(init)
+        return train_loss, test_loss
+    
+    def predict(self, dataloader):
 
-        copy_(model.rbf.freq, 'rbf_layer/frequencies')
-        copy_(model.emb.emb.weight, 'emb_block/embeddings')
-        copy_(model.emb.lin_rbf.weight, 'emb_block/dense_rbf/kernel')
-        copy_(model.emb.lin_rbf.bias, 'emb_block/dense_rbf/bias')
-        copy_(model.emb.lin.weight, 'emb_block/dense/kernel')
-        copy_(model.emb.lin.bias, 'emb_block/dense/bias')
+        y_pred = torch.zeros((len(dataloader.dataset),))
+        y_true = torch.zeros((len(dataloader.dataset),))
 
-        for i, block in enumerate(model.output_blocks):
-            copy_(block.lin_rbf.weight, f'output_blocks/{i}/dense_rbf/kernel')
-            copy_(block.lin_up.weight,
-                  f'output_blocks/{i}/up_projection/kernel')
-            for j, lin in enumerate(block.lins):
-                copy_(lin.weight, f'output_blocks/{i}/dense_layers/{j}/kernel')
-                copy_(lin.bias, f'output_blocks/{i}/dense_layers/{j}/bias')
-            copy_(block.lin.weight, f'output_blocks/{i}/dense_final/kernel')
 
-        for i, block in enumerate(model.interaction_blocks):
-            copy_(block.lin_rbf1.weight, f'int_blocks/{i}/dense_rbf1/kernel')
-            copy_(block.lin_rbf2.weight, f'int_blocks/{i}/dense_rbf2/kernel')
-            copy_(block.lin_sbf1.weight, f'int_blocks/{i}/dense_sbf1/kernel')
-            copy_(block.lin_sbf2.weight, f'int_blocks/{i}/dense_sbf2/kernel')
+        b = dataloader.batch_size
 
-            copy_(block.lin_ji.weight, f'int_blocks/{i}/dense_ji/kernel')
-            copy_(block.lin_ji.bias, f'int_blocks/{i}/dense_ji/bias')
-            copy_(block.lin_kj.weight, f'int_blocks/{i}/dense_kj/kernel')
-            copy_(block.lin_kj.bias, f'int_blocks/{i}/dense_kj/bias')
+        for idx, (sites,_,y,) in enumerate(dataloader):
 
-            copy_(block.lin_down.weight,
-                  f'int_blocks/{i}/down_projection/kernel')
-            copy_(block.lin_up.weight, f'int_blocks/{i}/up_projection/kernel')
+            self.eval()
+            
+            
+            
+            with torch.no_grad():
+                sites = sites.float().to('cuda')
+                y = y.float().to('cuda')
+                y_hat = self.forward(sites)
+                y_hat = y_hat.reshape(y_hat.shape[0]).cpu()
 
-            for j, layer in enumerate(block.layers_before_skip):
-                copy_(layer.lin1.weight,
-                      f'int_blocks/{i}/layers_before_skip/{j}/dense_1/kernel')
-                copy_(layer.lin1.bias,
-                      f'int_blocks/{i}/layers_before_skip/{j}/dense_1/bias')
-                copy_(layer.lin2.weight,
-                      f'int_blocks/{i}/layers_before_skip/{j}/dense_2/kernel')
-                copy_(layer.lin2.bias,
-                      f'int_blocks/{i}/layers_before_skip/{j}/dense_2/bias')
+                _b = y_hat.shape[0]
 
-            copy_(block.lin.weight, f'int_blocks/{i}/final_before_skip/kernel')
-            copy_(block.lin.bias, f'int_blocks/{i}/final_before_skip/bias')
 
-            for j, layer in enumerate(block.layers_after_skip):
-                copy_(layer.lin1.weight,
-                      f'int_blocks/{i}/layers_after_skip/{j}/dense_1/kernel')
-                copy_(layer.lin1.bias,
-                      f'int_blocks/{i}/layers_after_skip/{j}/dense_1/bias')
-                copy_(layer.lin2.weight,
-                      f'int_blocks/{i}/layers_after_skip/{j}/dense_2/kernel')
-                copy_(layer.lin2.bias,
-                      f'int_blocks/{i}/layers_after_skip/{j}/dense_2/bias')
+            y_pred[idx*b:idx*b+_b] = y_hat
+            y_true[idx*b:idx*b+_b] = y
 
-        random_state = np.random.RandomState(seed=42)
-        perm = torch.from_numpy(random_state.permutation(np.arange(130831)))
-        perm = perm.long()
-        train_idx = perm[:110000]
-        val_idx = perm[110000:120000]
-        test_idx = perm[120000:]
-
-        return model, (dataset[train_idx], dataset[val_idx], dataset[test_idx])
-
+        return y_pred, y_true

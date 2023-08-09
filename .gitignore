@@ -1,7 +1,7 @@
 /model_data/MFI/pore/
 /model_data/MFI/1.0/pore/
 /model_data/MFI/1.0/pore1/
-
+/model_data/
 *.out
 
 # Byte-compiled / optimized / DLL files
@@ -158,3 +158,5 @@ cython_debug/
 #.idea/
 Data_Isotherms/isomors2.zip
 Data_Isotherms/isomors2pdf.zip
+Untitled.ipynb
+*.pth
