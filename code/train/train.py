@@ -114,7 +114,7 @@ if __name__ == "__main__":
 
         elif args.model_type == 'dime':
 
-            mppn = DimeNet(idx1, idx2, torch.tensor(X), torch.tensor(l)).to('cuda')
+            mpnn = DimeNet(idx1, idx2, torch.tensor(X), torch.tensor(l)).to('cuda')
 
         print('starting fitting!')
         trainloss, testloss = mpnn.fit(trainloader, testloader, args.epochs, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':0.001}, crit_kwargs={'delta':1.0})
