@@ -119,7 +119,10 @@ if __name__ == "__main__":
             _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
 
         print('starting fitting!')
-        trainloss, testloss = mpnn.fit(trainloader, testloader, args.epochs, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':0.001}, crit_kwargs={'delta':1.0})
+
+        lr = 0.1 if args.model_type == 'dime' else 0.001
+        
+        trainloss, testloss = mpnn.fit(trainloader, testloader, args.epochs, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':lr}, crit_kwargs={'delta':1.0})
 
 
         print('done fitting!')
