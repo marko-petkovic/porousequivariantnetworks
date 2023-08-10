@@ -18,6 +18,7 @@ from models.equivariant_mpnn import MPNN, MPNNPORE
 from models.megnet import MEGNet
 from models.cgcnn import CGCNN
 from models.schnet import SchNet
+from models.dimenet import DimeNetPlusPlus as DimeNet
 
 from utils.ZeoliteData import get_zeolite, get_data_pore, get_data_graph, get_data_megnet
 from utils.dataloading import get_data, get_graph_data
@@ -29,7 +30,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
     #parser.add_argument('-n', '--name', type=str)
-    parser.add_argument('-m', '--model_type', choices=['pore', 'equi','megnet','cgcnn','schnet'], type=str)
+    parser.add_argument('-m', '--model_type', choices=['pore', 'equi','megnet','cgcnn','schnet','dime'], type=str)
     parser.add_argument('-z', '--zeolite', choices=['MOR', 'MFI'], type=str)
     parser.add_argument('-p', '--prop_train', type=float, default=1.0)
     parser.add_argument('-r', '--repetitions', type=int, default=1)
@@ -110,6 +111,10 @@ if __name__ == "__main__":
 
             
             _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
+
+        elif args.model_type == 'dime':
+
+            mppn = DimeNet(idx1, idx2, torch.tensor(X), torch.tensor(l)).to('cuda')
 
         print('starting fitting!')
         trainloss, testloss = mpnn.fit(trainloader, testloader, args.epochs, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':0.001}, crit_kwargs={'delta':1.0})

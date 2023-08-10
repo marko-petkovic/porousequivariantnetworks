@@ -3,6 +3,7 @@
 /model_data/MFI/1.0/pore1/
 /model_data/
 *.out
+/figures/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
