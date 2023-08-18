@@ -2,6 +2,8 @@
 /model_data/MFI/1.0/pore/
 /model_data/MFI/1.0/pore1/
 /model_data/
+/model_data_random/
+model_data_random/
 *.out
 /figures/
 
