@@ -38,6 +38,7 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--epochs', type=int, default=50)
     parser.add_argument('-s', '--sub_lim', type=int, default=12)
     parser.add_argument('-a', '--aggregate_pore', type=bool, default=False)
+    parser.add_argument('-q', '--random_split', type=bool, default=False)
 
     
     args = parser.parse_args()
@@ -52,6 +53,9 @@ if __name__ == "__main__":
         model_name = f'model_{i+1+args.initial_repetition}'
         
         data_dir = f'model_data/{args.zeolite}/{args.prop_train}/{args.model_type}/{model_name}/'
+        if args.random_split:
+            data_dir = f'model_data_random/{args.zeolite}/{args.prop_train}/{args.model_type}/{model_name}/'
+
 
         os.makedirs(data_dir)
 
@@ -78,7 +82,7 @@ if __name__ == "__main__":
                             idx1_ps.to('cuda'), idx2_ps.to('cuda'), idx2_oh_ps.to('cuda'),
                             hid_size=[8]*6, site_emb_size=8, edge_emb_size=8, mlp_size=24,
                             centers=10, mx_d=6, width=1, pool='sum', pool_pore=args.aggregate_pore).to('cuda')
-            _, testloader, trainloader = get_data_pore(atoms, hoa, edges, pore, edges_sp, edges_ps, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
+            _, testloader, trainloader = get_data_pore(atoms, hoa, edges, pore, edges_sp, edges_ps, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
         elif args.model_type == 'equi':
 
@@ -87,14 +91,14 @@ if __name__ == "__main__":
                             centers=10, mx_d=6, width=1, pool='sum').to('cuda')
 
 
-            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
         elif args.model_type == 'megnet':
 
             mpnn = MEGNet(idx1.to('cuda'), idx2.to('cuda')).to('cuda')
 
 
-            _, testloader, trainloader = get_data_megnet(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
+            _, testloader, trainloader = get_data_megnet(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
         
         elif args.model_type == 'cgcnn':
@@ -102,7 +106,7 @@ if __name__ == "__main__":
             mpnn = CGCNN(idx1.to('cuda'), idx2.to('cuda')).to('cuda')
 
 
-            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
             
         
         elif args.model_type == 'schnet':
@@ -110,17 +114,17 @@ if __name__ == "__main__":
             mpnn = SchNet(d).to('cuda')
 
             
-            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
         elif args.model_type == 'dime':
 
             mpnn = DimeNet(idx1, idx2, torch.tensor(X), torch.tensor(l)).to('cuda')
 
-            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train)
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
         print('starting fitting!')
 
-        lr = 0.01 if args.model_type == 'dime' else 0.001
+        lr = 0.005 if args.model_type == 'dime' else 0.001
         
         trainloss, testloss = mpnn.fit(trainloader, testloader, args.epochs, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':lr}, crit_kwargs={'delta':1.0})
 

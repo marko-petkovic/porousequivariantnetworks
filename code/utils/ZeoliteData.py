@@ -339,7 +339,7 @@ def get_data_graph(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_lim
     
     # random split
     if random:
-        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size)
+        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size, random_state=1)
     
     # split based on hoa
     elif hoa_lim is not None:
@@ -408,7 +408,7 @@ def get_data_pore(atoms, hoa, edges, pore,edges_sp, edges_ps, bs=10, random=Fals
     
     # random split
     if random:
-        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size)
+        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size, random_state=1)
     
     # split based on hoa
     elif hoa_lim is not None:
@@ -479,7 +479,7 @@ def get_data_megnet(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_li
     
     # random split
     if random:
-        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size)
+        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size, random_state=1)
     
     # split based on hoa
     elif hoa_lim is not None:
