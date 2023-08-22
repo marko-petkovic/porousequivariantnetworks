@@ -7,8 +7,6 @@ from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from sklearn.model_selection import train_test_split
 
 
-
-
 zeolite_dict = {'MFI':
                {
                    'ref': 
@@ -93,38 +91,7 @@ zeolite_dict = {'MFI':
                 'MOR':
                 {
                     'ref':
-                    # np.array([
-                    #     [1,1,1],
-                    #     [1,1,1],
-                    #     [-1,1,1],
-                    #     [-1,1,1],
-                    #     [1,-1,1],
-                    #     [1,-1,1],
-                    #     [-1,-1,1],
-                    #     [-1,-1,1],
-                    #     [-1,-1,-1],
-                    #     [-1,-1,-1],
-                    #     [1,-1,-1],
-                    #     [1,-1,-1],
-                    #     [-1,1,-1],
-                    #     [-1,1,-1],
-                    #     [1,1,-1],
-                    #     [1,1,-1]
-                    # ]),
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
+                   
                     np.array([
                         [1,1,1],
                         [-1,-1,1],
@@ -145,24 +112,7 @@ zeolite_dict = {'MFI':
                     ]),
                     
                     'tra':
-                    # np.array([
-                    #     [0,0,0],
-                    #     [.5,.5,0],
-                    #     [0,0,0],
-                    #     [.5,.5,0],
-                    #     [0,0,.5],
-                    #     [.5,.5,.5],
-                    #     [0,0,.5],
-                    #     [.5,.5,.5],
-                    #     [0,0,0],
-                    #     [.5,.5,0],
-                    #     [0,0,0],
-                    #     [.5,.5,0],
-                    #     [0,0,.5],
-                    #     [.5,.5,.5],
-                    #     [0,0,.5],
-                    #     [.5,.5,.5]
-                    # ]),
+
                                
                     
                     np.array([
@@ -187,12 +137,7 @@ zeolite_dict = {'MFI':
                     'l':np.array([18.256,20.534,7.5420]),
                     
                     'X':
-                    # np.array([
-                    #     [.3057, .0736, .0435],
-                    #     [.3028, .3106, .0437],
-                    #     [.0848, .3791, .2500],
-                    #     [.0848, .2227, .2500]
-                    # ]),
+
                     np.array([
                         [.3057, .0736, .0435],
                         [.3028, .3106, .0437],
@@ -394,7 +339,7 @@ def get_data_graph(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_lim
     
     # random split
     if random:
-        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size)
+        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size, random_state=1)
     
     # split based on hoa
     elif hoa_lim is not None:
@@ -456,14 +401,14 @@ def get_data_graph(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_lim
     return trainloader, testloader, trainloader_raw    
     
     
-def get_data_pore(atoms, hoa, edges, pore,edges_sp, edges_ps, bs=10, random=False, hoa_lim=None, sub_lim=None, train_geq=False, power=.75, test_size=.10, p=1):
+def get_data_pore(atoms, hoa, edges, pore,edges_sp, edges_ps, bs=10, random=False, hoa_lim=None, sub_lim=None, train_geq=False, power=.75, test_size=.10, p=1, drop_last=False):
     _X = torch.tensor(atoms).unsqueeze(-1)
     _X2 = edges
     _y = torch.tensor(hoa)
     
     # random split
     if random:
-        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size)
+        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size, random_state=1)
     
     # split based on hoa
     elif hoa_lim is not None:
@@ -504,27 +449,27 @@ def get_data_pore(atoms, hoa, edges, pore,edges_sp, edges_ps, bs=10, random=Fals
     # this way the distribution of HoA the model trains on is more uniform
     # in practice, the trainloader is oversampling lower and higer values
     # and undersampling values in the middle
-    weights = torch.zeros_like(_y_train)
+    # weights = torch.zeros_like(_y_train)
     
-    hist, bins = torch.histogram(_y_train)
+    # hist, bins = torch.histogram(_y_train)
     
-    for i in range(hist.shape[0]):
+    # for i in range(hist.shape[0]):
         
-        indices = ((bins[i] <= _y_train)*(_y_train < bins[i+1]))
-        weights[indices] = 1/(hist[i]**power)
+    #     indices = ((bins[i] <= _y_train)*(_y_train < bins[i+1]))
+    #     weights[indices] = 1/(hist[i]**power)
     
     
     
-    wrs = WeightedRandomSampler(weights, weights.shape[0])
+    # wrs = WeightedRandomSampler(weights, weights.shape[0])
     
     
-    trainloader = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, sampler=wrs)
-    testloader = DataLoader(ZeolitePoreDataset(_X_test, _X2, pore, edges_sp, edges_ps, _y_test), batch_size=bs, shuffle=False)
+    #trainloader = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, sampler=wrs)
+    testloader = DataLoader(ZeolitePoreDataset(_X_test, _X2, pore, edges_sp, edges_ps, _y_test), batch_size=bs, shuffle=False, drop_last=drop_last)
 
     # also create a trainloader without oversampling
-    trainloader_raw = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, shuffle=True)
+    trainloader_raw = DataLoader(ZeolitePoreDataset(_X_train, _X2, pore, edges_sp, edges_ps, _y_train), batch_size=bs, shuffle=True, drop_last=drop_last)
     
-    return trainloader, testloader, trainloader_raw
+    return None, testloader, trainloader_raw
 
 
 def get_data_megnet(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_lim=None, train_geq=False, power=.75, test_size=.10, p=1):
@@ -534,7 +479,7 @@ def get_data_megnet(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_li
     
     # random split
     if random:
-        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size)
+        train_idx, test_idx = train_test_split(list(range(_X.shape[0])), test_size=test_size, random_state=1)
     
     # split based on hoa
     elif hoa_lim is not None:
@@ -596,3 +541,4 @@ def get_data_megnet(atoms, hoa, edges, bs=10, random=False, hoa_lim=None, sub_li
     trainloader_raw = DataLoader(ZeoliteMegDataset(_X_train, _X2, _y_train), batch_size=bs, shuffle=True)
     
     return trainloader, testloader, trainloader_raw
+
