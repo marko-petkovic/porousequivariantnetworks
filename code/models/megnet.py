@@ -187,9 +187,9 @@ class MEGNetBlock(nn.Module):
     
 
 class MEGNet(nn.Module):
-    def __init__(self, idx1, idx2, site_emb_size=8, edge_emb_size=8, state_emb_size=8,
-                 width=1, mx_d=10, mn_d=0, centers=10,
-                 pre_h1=8, pre_h2=8, m_h1=8, m_h2=8, post_h1=24, post_h2=24, n_blocks=6,
+    def __init__(self, idx1, idx2, site_emb_size=36, edge_emb_size=36, state_emb_size=36,
+                 width=0.5, mx_d=10, mn_d=0, centers=100,
+                 pre_h1=64, pre_h2=32, m_h1=64, m_h2=64, post_h1=32, post_h2=16, n_blocks=3,
                  ):
         super(MEGNet, self).__init__()
         

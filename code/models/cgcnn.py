@@ -33,9 +33,9 @@ class ConvLayer(nn.Module):
 
 
 class CGCNN(nn.Module):
-    def __init__(self, idx1, idx2, site_emb_size=8, edge_emb_size=8,
+    def __init__(self, idx1, idx2, site_emb_size=100, edge_emb_size=20,
                  width=1, mx_d=10, mn_d=0, centers=10,
-                 h1 = 24, h2 = 24, n_blocks = 6):
+                 h1 = 100, h2 = 100, n_blocks = 2):
         super(CGCNN, self).__init__()
         
         self.idx1 = idx1.cuda()

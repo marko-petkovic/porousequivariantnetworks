@@ -135,8 +135,8 @@ class CFConv(MessagePassing):
 
 class SchNet(nn.Module):
     
-    def __init__(self, d, hidden_channels=8, num_filters=6, num_interactions=6,
-                 num_gaussians=10, cutoff=7.5):
+    def __init__(self, d, hidden_channels=128, num_filters=128, num_interactions=6,
+                 num_gaussians=50, cutoff=10.0):
         
         super().__init__()
         
