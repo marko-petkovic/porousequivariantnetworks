@@ -52,9 +52,9 @@ if __name__ == "__main__":
         
         model_name = f'model_{i+1+args.initial_repetition}'
         
-        data_dir = f'model_data/{args.zeolite}/{args.prop_train}/{args.model_type}/{model_name}/'
+        data_dir = f'new_model_data/{args.zeolite}/{args.prop_train}/{args.model_type}/{model_name}/'
         if args.random_split:
-            data_dir = f'model_data_random/{args.zeolite}/{args.prop_train}/{args.model_type}/{model_name}/'
+            data_dir = f'new_model_data_random/{args.zeolite}/{args.prop_train}/{args.model_type}/{model_name}/'
 
 
         os.makedirs(data_dir)
