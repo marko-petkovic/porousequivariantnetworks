@@ -328,12 +328,12 @@ class MPNN(nn.Module):
                  site_emb_size=16, edge_emb_size=12, hid_size=[16,16,32],
                  mlp_size=32, out_size=1, site_pred=False,
                  width=1, mx_d=10, mn_d=0, centers=10, virtual=False,
-                 pool='none'):
+                 pool='none', set=False):
         
         super().__init__()
         
         # get permutation group
-        self.perms = self.get_perms(X, ref, tra)
+        self.perms = self.get_perms(X, ref, tra, set)
         self.site_pred = site_pred
         self.gaussian_kwargs = dict(max_distance=mx_d, num_centers=centers, width=width, min_distance=mn_d)
         
@@ -370,7 +370,16 @@ class MPNN(nn.Module):
         
         
         
-    def get_perms(self, X, ref, tra):    
+    def get_perms(self, X, ref, tra, set=False):    
+        
+        if set:
+            permutations = np.zeros((2, X.shape[0]),int)
+            p = np.arange(X.shape[0])
+            p[0], p[1] = 1,0
+            permutations[0] = p
+            permutations[1,:-1] = p[1:]
+            return permutations
+        
         permutations = np.zeros((ref.shape[0], X.shape[0]),int)
         for i in range(ref.shape[0]):
             old_X = X.copy()
@@ -478,7 +487,7 @@ class MPNNPORE(nn.Module):
                  site_emb_size=16, edge_emb_size=12, hid_size=[16,16,32],
                  mlp_size=32, out_size=1, site_pred=False,
                  width=1, mx_d=10, mn_d=0, centers=10,
-                 pool='none', add_p=False, pool_pore=False):
+                 pool='none', add_p=False, pool_pore=False, set=False):
         
         super().__init__()
 
@@ -486,8 +495,8 @@ class MPNNPORE(nn.Module):
         self.pool_pore = pool_pore
                      
         # get permutation group
-        self.perms = self.get_perms(X, ref, tra)
-        self.perms_p = self.get_perms(X_p, ref, tra)
+        self.perms = self.get_perms(X, ref, tra, set)
+        self.perms_p = self.get_perms(X_p, ref, tra, set)
         self.site_pred = site_pred
         
         self.gaussian_kwargs = dict(max_distance=mx_d, num_centers=centers, width=width, min_distance=mn_d)
@@ -546,7 +555,17 @@ class MPNNPORE(nn.Module):
         
         
         
-    def get_perms(self, X, ref, tra):    
+    def get_perms(self, X, ref, tra, set=False):
+
+        if set:
+            permutations = np.zeros((2, X.shape[0]),int)
+            p = np.arange(X.shape[0])
+            p[0], p[1] = 1,0
+            permutations[0] = p
+            permutations[1,:-1] = p[1:]
+            return permutations
+            
+        
         permutations = np.zeros((ref.shape[0], X.shape[0]),int)
         for i in range(ref.shape[0]):
             old_X = X.copy()

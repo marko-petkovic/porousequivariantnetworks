@@ -30,7 +30,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
     #parser.add_argument('-n', '--name', type=str)
-    parser.add_argument('-m', '--model_type', choices=['pore', 'equi','megnet','cgcnn','schnet','dime'], type=str)
+    parser.add_argument('-m', '--model_type', choices=['pore', 'equi','megnet','cgcnn','schnet','dime','poreset', 'equiset'], type=str)
     parser.add_argument('-z', '--zeolite', choices=['MOR', 'MFI'], type=str)
     parser.add_argument('-p', '--prop_train', type=float, default=1.0)
     parser.add_argument('-r', '--repetitions', type=int, default=1)
@@ -84,6 +84,19 @@ if __name__ == "__main__":
                             centers=10, mx_d=6, width=1, pool='sum', pool_pore=args.aggregate_pore).to('cuda')
             _, testloader, trainloader = get_data_pore(atoms, hoa, edges, pore, edges_sp, edges_ps, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
+        elif args.model_type == 'poreset':
+
+            edges_sp, idx1_sp, idx2_sp, idx2_oh_sp = get_graph_data(A_pore, d_pore)
+            edges_ps, idx1_ps, idx2_ps, idx2_oh_ps = get_graph_data(A_pore.T, d_pore.T)
+
+            mpnn = MPNNPORE(idx1.to('cuda'), idx2.to('cuda'), idx2_oh.to('cuda'), X, X_pore, ref, tra,
+                            idx1_sp.to('cuda'), idx2_sp.to('cuda'), idx2_oh_sp.to('cuda'), 
+                            idx1_ps.to('cuda'), idx2_ps.to('cuda'), idx2_oh_ps.to('cuda'),
+                            hid_size=[8]*6, site_emb_size=8, edge_emb_size=8, mlp_size=24,
+                            centers=10, mx_d=6, width=1, pool='sum', pool_pore=args.aggregate_pore).to('cuda')
+            _, testloader, trainloader = get_data_pore(atoms, hoa, edges, pore, edges_sp, edges_ps, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
+
+        
         elif args.model_type == 'equi':
 
             mpnn = MPNN(idx1.to('cuda'), idx2.to('cuda'), idx2_oh.to('cuda'), X, ref, tra,
@@ -93,6 +106,16 @@ if __name__ == "__main__":
 
             _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
+        elif args.model_type == 'equiset':
+
+            mpnn = MPNN(idx1.to('cuda'), idx2.to('cuda'), idx2_oh.to('cuda'), X, ref, tra,
+                            hid_size=[8]*6, site_emb_size=8, edge_emb_size=8, mlp_size=24,
+                            centers=10, mx_d=6, width=1, pool='sum', set=True).to('cuda')
+
+
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
+
+        
         elif args.model_type == 'megnet':
 
             mpnn = MEGNet(idx1.to('cuda'), idx2.to('cuda')).to('cuda')
