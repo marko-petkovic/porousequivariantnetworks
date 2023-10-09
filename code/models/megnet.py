@@ -165,7 +165,7 @@ class MEGNetBlock(nn.Module):
         )
 
     def forward(self, sites, bonds, states, indices1, indices2):
-        
+        initial_sites, initial_bonds, initial_states = sites, bonds, states
         
         sites1 = self.sites_fc(sites)
         bonds1 = self.bonds_fc(bonds)
@@ -178,9 +178,9 @@ class MEGNetBlock(nn.Module):
         sites2 = self.siteupdate(sites1, bonds2, states1, indices1)
         states2 = self.stateupdate(sites2, bonds2, states1)
 
-        sites2 = sites + sites2
-        bonds2 = bonds + bonds2
-        states2 = states + states2
+        sites2 = initial_sites + sites2
+        bonds2 = initial_bonds + bonds2
+        states2 = initial_states + states2
 
         return sites2, bonds2, states2
 
