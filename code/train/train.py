@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
         print('starting fitting!')
 
-        lr = 0.005 if args.model_type == 'dime' else 0.001
+        lr = 0.0005 if args.model_type == 'dime' else 0.001
         
         trainloss, testloss = mpnn.fit(trainloader, testloader, args.epochs, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':lr}, crit_kwargs={'delta':1.0})
 
