@@ -12,6 +12,40 @@ from torch_geometric.utils import scatter
 
 from utils.dataloading import triplets
 
+
+
+class BatchNorm1d(nn.Module):
+    def __init__(self, num_features, eps=1e-5, momentum=0.1):
+        super().__init__()
+        self.eps = eps
+        self.momentum = momentum
+        self.num_features = num_features
+
+        self.gamma = nn.Parameter(torch.ones(num_features))
+        self.beta = nn.Parameter(torch.zeros(num_features))
+        self.register_buffer('running_mean', torch.zeros(num_features))
+        self.register_buffer('running_var', torch.ones(num_features))
+
+    def forward(self, x):
+        if self.training:
+            mean = x.mean(dim=2, keepdim=True)
+            var = x.var(dim=2, unbiased=False, keepdim=True)
+
+            
+            self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean.mean(dim=0)
+            self.running_var = (1 - self.momentum) * self.running_var + self.momentum * var.mean(dim=0)
+
+            x = (x - mean) / (var + self.eps).sqrt()
+        else:
+            
+            x = (x - self.running_mean) / (self.running_var + self.eps).sqrt()
+
+        x = x * self.gamma.view(1, 1, -1) + self.beta.view(1, 1, -1)
+
+        return x
+
+
+
 class RBFExpansion(nn.Module):
     def __init__(
         self,
@@ -52,10 +86,11 @@ class EdgeGatedGraphConv(nn.Module):
         self.src_gate = nn.Linear(input_features, output_features)
         self.dst_gate = nn.Linear(input_features, output_features)
         self.edge_gate = nn.Linear(input_features, output_features)
-
+        self.bn_edges = BatchNorm1d(output_features)
+        
         self.src_update = nn.Linear(input_features, output_features)
         self.dst_update = nn.Linear(input_features, output_features)
-
+        self.bn_nodes = BatchNorm1d(output_features)
 
         self.i = i
         self.j = j
@@ -80,8 +115,8 @@ class EdgeGatedGraphConv(nn.Module):
 
         x = self.src_update(node_feats) + h
 
-        x = F.silu(x)
-        y = F.silu(y)
+        x = F.silu(self.bn_nodes(x))
+        y = F.silu(self.bn_edges(y))
 
         if self.residual:
             x = node_feats + x
@@ -111,10 +146,11 @@ class MLPLayer(nn.Module):
 
         super().__init__()
         self.layer = nn.Linear(in_features, out_features)
-
+        self.bn = nn.BatchNorm1d(out_features)
+    
     def forward(self, x):
 
-        return F.silu(self.layer(x))
+        return F.silu(self.bn(self.layer(x)))
 
 class ALIGNN(nn.Module):
 
@@ -128,7 +164,9 @@ class ALIGNN(nn.Module):
         self.angle = angle.float().cuda()
         self.dist = dist.float().cuda()
 
-        self.atom_embedding = MLPLayer(1, hidden_features)
+        self.atom_embedding = nn.Sequential(nn.Linear(1, hidden_features),
+                                            BatchNorm1d(hidden_features),
+                                            nn.SiLU())
         self.edge_embedding = nn.Sequential(RBFExpansion(vmin=0, vmax=8.0, bins=centers),
                                             MLPLayer(centers, centers),
                                             MLPLayer(centers, hidden_features))
