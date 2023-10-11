@@ -20,9 +20,10 @@ from models.cgcnn import CGCNN
 from models.schnet import SchNet
 from models.dimenet import DimeNetPlusPlus as DimeNet
 from models.alignn import ALIGNN
+from models.matformer import Matformer
 
 from utils.ZeoliteData import get_zeolite, get_data_pore, get_data_graph, get_data_megnet
-from utils.dataloading import get_data, get_graph_data
+from utils.dataloading import get_data, get_graph_data, get_graph_data_mat
 
 import argparse
 
@@ -31,7 +32,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
     #parser.add_argument('-n', '--name', type=str)
-    parser.add_argument('-m', '--model_type', choices=['pore', 'equi','megnet','cgcnn','schnet','dime','poreset', 'equiset', 'alignn'], type=str)
+    parser.add_argument('-m', '--model_type', choices=['pore', 'equi','megnet','cgcnn','schnet','dime','poreset', 'equiset', 'alignn','matformer'], type=str)
     parser.add_argument('-z', '--zeolite', choices=['MOR', 'MFI'], type=str)
     parser.add_argument('-p', '--prop_train', type=float, default=1.0)
     parser.add_argument('-r', '--repetitions', type=int, default=1)
@@ -149,6 +150,13 @@ if __name__ == "__main__":
         elif args.model_type == 'alignn':
 
             mpnn = ALIGNN(idx1, idx2, torch.tensor(X), torch.tensor(l)).to('cuda')
+
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=16, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
+
+        elif args.model_type == 'matformer':
+
+            idx1, idx2, edges = get_graph_data_mat(X, l)
+            mpnn = Matformer(idx1, idx2, edges).to('cuda')
 
             _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=16, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
