@@ -158,7 +158,7 @@ if __name__ == "__main__":
             idx1, idx2, edges = get_graph_data_mat(X, l)
             mpnn = Matformer(idx1, idx2, edges).to('cuda')
 
-            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=16, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges.float(), bs=16, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
         print('starting fitting!')
 
