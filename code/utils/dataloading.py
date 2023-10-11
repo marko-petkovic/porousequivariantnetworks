@@ -16,6 +16,8 @@ from utils.ZeoliteData import get_zeolite, apply_symmetry
 
 from torch_geometric.typing import OptTensor, SparseTensor
 
+from itertools import product
+
 
 def periodic_boundary(d):
     '''
@@ -456,8 +458,50 @@ def get_distance_matrix(X1,X2,l):
     return d
 
 
+def get_distance_matrix_no_pbc(X1,X2,l):
+    
+    d = np.zeros((X1.shape[0], X2.shape[0]))
+
+    for i in range(X1.shape[0]):
+        for j in range(X2.shape[0]):
+
+            d[i,j] = np.sqrt(np.sum(((X1[i]-X2[j])*l)**2))
+
+    return d
+
+def is_self_edge(u):
+    return (u == [[0,0,1],
+                  [0,1,0],
+                  [1,0,0],
+                  [0,1,1],
+                  [1,0,1],
+                  [1,1,0]]).all(1).any()
+
+def get_graph_data_mat(X, l, cutoff=5.0):
+    uc = np.array(list(product([-1,0,1],[-1,0,1],[-1,0,1])))
+    dm = np.zeros((X.shape[0], X.shape[0], uc.shape[0]))
+    cnt = 0
+    for u in uc:
+        X1 = X
+        X2 = X+u
+        dm[:,:,cnt] = get_distance_matrix_no_pbc(X1, X2, l)
+    
+    
+        cnt += 1
 
 
+    edges, idx1, idx2 = [], [], []
+    for i in range(dm.shape[0]):
+        for j in range(dm.shape[1]):
+            for u in range(dm.shape[2]):
+    
+                if dm[i,j,u] < cutoff or (i==j and is_self_edge(uc[u])):
+    
+                    idx1.append(i)
+                    idx2.append(j)
+                    edges.append([dm[i,j,u]])
+
+    return torch.tensor(idx1), torch.tensor(idx2), torch.tensor(edges)
 
 def get_graph_data(A, d):
     '''
