@@ -115,8 +115,10 @@ class EdgeGatedGraphConv(nn.Module):
 
         x = self.src_update(node_feats) + h
 
-        x = F.silu(self.bn_nodes(x))
-        y = F.silu(self.bn_edges(y))
+        x = F.silu(x)
+        y = F.suly(y)
+        # x = F.silu(self.bn_nodes(x))
+        # y = F.silu(self.bn_edges(y))
 
         if self.residual:
             x = node_feats + x
@@ -146,11 +148,12 @@ class MLPLayer(nn.Module):
 
         super().__init__()
         self.layer = nn.Linear(in_features, out_features)
-        self.bn = nn.BatchNorm1d(out_features)
+        # self.bn = nn.BatchNorm1d(out_features)
     
     def forward(self, x):
+        return F.silu(self.layer(x))
 
-        return F.silu(self.bn(self.layer(x)))
+        # return F.silu(self.bn(self.layer(x)))
 
 class ALIGNN(nn.Module):
 
@@ -165,7 +168,7 @@ class ALIGNN(nn.Module):
         self.dist = dist.float().cuda()
 
         self.atom_embedding = nn.Sequential(nn.Linear(1, hidden_features),
-                                            BatchNorm1d(hidden_features),
+                                            # BatchNorm1d(hidden_features),
                                             nn.SiLU())
         self.edge_embedding = nn.Sequential(RBFExpansion(vmin=0, vmax=8.0, bins=centers),
                                             MLPLayer(centers, centers),
