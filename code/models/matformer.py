@@ -1,7 +1,16 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
+import torch.optim as optim
+from tqdm import tqdm
+from torch_geometric.nn import MessagePassing
+
+import numpy as np
+import math
+
 from torch_geometric.nn.conv import MessagePassing
+from torch_geometric.utils import scatter
 
 from torch import Tensor
 
@@ -51,7 +60,7 @@ class MatformerConv(MessagePassing):
         bias = True,
         root_weight: bool = True,
     ):
-        super(self).__init__(node_dim=0, aggr='add')
+        super().__init__(node_dim=0, aggr='add')
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -111,7 +120,7 @@ class MatformerConv(MessagePassing):
             self.lin_beta.reset_parameters()
 
     def forward(self, x, edge_index,
-                edge_attr: OptTensor = None, return_attention_weights=None):
+                edge_attr = None, return_attention_weights=None):
 
         H, C = self.heads, self.out_channels
         if isinstance(x, Tensor):
@@ -178,9 +187,13 @@ class MatformerConv(MessagePassing):
 class Matformer(nn.Module):
     """att pyg implementation."""
 
-    def __init__(self, idx1, idx2, edges, node_features, edge_features,):
+    def __init__(self, idx1, idx2, edges, node_features=128, edge_features=128, fc_features=128, output_features=1, heads=4, conv_layers=5):
         """Set up att modules."""
         super().__init__()
+
+        self.edge_index = torch.vstack((idx1,idx2)).long().cuda()
+        self.edge_attr = edges.cuda()
+        
         self.atom_embedding = nn.Linear(
             1, node_features
         )
@@ -188,22 +201,22 @@ class Matformer(nn.Module):
             RBFExpansion(
                 vmin=0,
                 vmax=8.0,
-                bins=config.edge_features,
+                bins=edge_features,
             ),
-            nn.Linear(config.edge_features, config.node_features),
+            nn.Linear(edge_features, node_features),
             nn.Softplus(),
-            nn.Linear(config.node_features, config.node_features),
+            nn.Linear(node_features, node_features),
         )
 
         self.att_layers = nn.ModuleList(
             [
-                MatformerConv(in_channels=config.node_features, out_channels=config.node_features, heads=config.node_layer_head, edge_dim=config.node_features)
-                for _ in range(config.conv_layers)
+                MatformerConv(in_channels=node_features, out_channels=node_features, heads=heads, edge_dim=node_features)
+                for _ in range(conv_layers)
             ]
         )
         
         self.fc = nn.Sequential(
-            nn.Linear(config.node_features, config.fc_features), nn.SiLU()
+            nn.Linear(node_features, fc_features), nn.SiLU()
         )
         self.sigmoid = nn.Sigmoid()
 
@@ -214,17 +227,27 @@ class Matformer(nn.Module):
 
 
     def forward(self, x):
+        
+        bs, at = x.shape[:2]
+
+        x = x.reshape(bs*at,-1)
+        
+        batch = torch.arange(bs).repeat_interleave(at).cuda()
+        
+        batch_edge = (torch.arange(bs).repeat_interleave(self.edge_index.shape[1])[None].repeat(2,1).cuda() * at).long()
+        
         node_features = self.atom_embedding(x)
-        edge_feat = torch.norm(edge_attr, dim=1)
+        
+        edge_feat = self.edge_attr.repeat(bs, 1)
+        edge_index = (self.edge_index.repeat(1,bs) + batch_edge).long()
         
         edge_features = self.rbf(edge_feat)
         
-        node_features = self.att_layers[0](node_features, edge_index, edge_features)
-        node_features = self.att_layers[1](node_features, edge_index, edge_features)
-        node_features = self.att_layers[2](node_features, edge_index, edge_features)
-        node_features = self.att_layers[3](node_features, edge_index, edge_features)
-        node_features = self.att_layers[4](node_features, edge_index, edge_features)
-
+        
+        for att_layer in self.att_layers:
+            
+            node_features = att_layer(node_features, edge_index, edge_features)
+        
 
         # crystal-level readout
         features = scatter(node_features, batch, dim=0, reduce="mean")
@@ -236,6 +259,91 @@ class Matformer(nn.Module):
         out = self.fc_out(features)
         
         return out
+    
+    def fit(self, trainloader, testloader, epochs, crit=nn.HuberLoss, crit_kwargs={'delta':1}, opt=optim.Adam, opt_kwargs={'lr':0.001}, scale_loss=True):
+        
+        if scale_loss:
+            crit_kwargs['reduction'] = 'none'
+        
+        # defines optimizer + loss criterion
+        self.optimizer = opt(params=self.parameters(), **opt_kwargs)
+        self.criterion = crit(**crit_kwargs)
+        
+        train_loss = []
+        test_loss = []
+        
+        pbar = tqdm(range(epochs), unit='epoch', postfix='loss', position=0, leave=True)
+        for e in pbar:
+            self.train()
+            for idx, (sites,_,y) in enumerate(trainloader):
+                
+                # model breaks for batch size 1
+                if sites.shape[0] == 1:
+                    continue
+                
+                self.optimizer.zero_grad()
+                sites,  y = sites.float().to('cuda'), y.float().to('cuda')
+
+                y_hat = self.forward(sites)
+                y_hat = y_hat.reshape(y_hat.shape[0])
+                loss = self.criterion(y_hat, y)
+                if scale_loss:
+                    loss /= y
+                loss = loss.mean()
+                loss.backward()
+                self.optimizer.step()
+
+                train_loss.append(loss.item())
+
+        
+            self.eval()
+
+            for idx, (sites,_,y) in enumerate(testloader):
+                
+                
+                # model breaks for batch size 1
+                if sites.shape[0] == 1:
+                    continue
+                
+                with torch.no_grad():
+                    sites, y = sites.float().to('cuda'), y.float().to('cuda')
+                    y_hat = self.forward(sites)
+                    y_hat = y_hat.reshape(y_hat.shape[0])
+                    loss = self.criterion(y_hat, y)
+                    if scale_loss:
+                        loss /= y
+                    loss = loss.mean()
+                    test_loss.append(loss.item())
+            pbar.postfix = f'loss: {np.mean(train_loss[-len(trainloader)+1:]):.3f} test loss: {np.mean(test_loss[-len(testloader)+1:]):.3f}'
+
+        return train_loss, test_loss
+    
+    def predict(self, dataloader):
+
+        y_pred = torch.zeros((len(dataloader.dataset),))
+        y_true = torch.zeros((len(dataloader.dataset),))
+
+
+        b = dataloader.batch_size
+
+        for idx, (sites,_,y) in enumerate(dataloader):
+
+            self.eval()
+            
+            
+            
+            with torch.no_grad():
+                sites, y = sites.float().to('cuda'), y.float().to('cuda')
+                y_hat = self.forward(sites)
+                y_hat = y_hat.reshape(y_hat.shape[0]).cpu()
+
+                _b = y_hat.shape[0]
+
+
+            y_pred[idx*b:idx*b+_b] = y_hat
+            y_true[idx*b:idx*b+_b] = y
+
+        return y_pred, y_true
 # building the graph:
 # calculate multigraph -> draw edges to all neighbouring unit cells 
 # add self edges
