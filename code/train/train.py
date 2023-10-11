@@ -150,7 +150,7 @@ if __name__ == "__main__":
 
             mpnn = ALIGNN(idx1, idx2, torch.tensor(X), torch.tensor(l)).to('cuda')
 
-            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=16, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
+            _, testloader, trainloader = get_data_graph(atoms, hoa, edges, bs=8, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
         print('starting fitting!')
 
