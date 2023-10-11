@@ -116,7 +116,7 @@ class EdgeGatedGraphConv(nn.Module):
         x = self.src_update(node_feats) + h
 
         x = F.silu(x)
-        y = F.suly(y)
+        y = F.silu(y)
         # x = F.silu(self.bn_nodes(x))
         # y = F.silu(self.bn_edges(y))
 
@@ -238,7 +238,9 @@ class ALIGNN(nn.Module):
 
                 train_loss.append(loss.item())
 
-        
+            torch.cuda.empty_cache()
+            gc.collect()
+            
             self.eval()
 
             for idx, (sites,_,y) in enumerate(testloader):
