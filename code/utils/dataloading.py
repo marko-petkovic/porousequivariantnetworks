@@ -503,6 +503,47 @@ def get_graph_data_mat(X, l, cutoff=5.0):
 
     return torch.tensor(idx1), torch.tensor(idx2), torch.tensor(edges)
 
+def get_graph_data_ecn(X, A, l):
+
+    # calculate fake X_o
+    X_o = np.zeros((2*X.shape[0], 3))
+    cnt = 0
+    for i in range(A.shape[0]):
+        for j in range(i,A.shape[1]):
+            if A[i,j] == 1:
+                D = X[j] - X[i]
+                D = np.where(D>.5, D-1, D)
+                D = np.where(D<-.5, D+1, D)
+                # print(D.shape)
+                X_o[cnt] = np.mod(X[i] + D/2, 1)
+                cnt +=1
+
+    # create super cell
+    uc = list(product(range(2), range(2), range(2)))
+    
+    S = torch.cat([torch.tensor(X+u) for u in uc])/2
+    S_u = torch.vstack([torch.tensor(u) for u in uc]).repeat_interleave(48, 0)
+
+    # calculate edges
+    d_O = (S[:,None] - S_o).abs()
+    d_O = np.where(d_O>0.5, d_O-1, d_O)*l*2
+    d_O = (d_O**2).sum(-1)**0.5
+    
+    edge_index = d_O.argpartition(2, axis=0)[:2,]
+    edge_index = np.concatenate([edge_index, np.flip(edge_index, 0)], 1)
+    
+    r, c = torch.tensor(edge_index)
+    
+    edge = (S[r] - S[c]).abs()
+    edge = np.where(edge>0.5, edge-1, edge)*l*2
+    edge = (edge**2).sum(-1)**0.5
+    unitcell = (S_u[r] - S_u[c]).abs()
+    uniq = unitcell.unique(dim=0)
+    comp = (unitcell[:,None] == uniq).all(-1)
+    color = (comp*1).argmax(1)
+
+    return torch.tensor(r), torch.tensor(c), torch.tensor(edge), color
+    
 def get_graph_data(A, d):
     '''
     creates graph data
