@@ -79,7 +79,7 @@ class MessageUpdate(nn.Module):
         self.attention1 = nn.Sequential(nn.Linear(out_features, 1), nn.Sigmoid())
         self.attention2 = nn.Sequential(nn.Linear(out_features, 1), nn.Sigmoid())
         
-    
+        
             
     def forward(self, sites, bonds):
 
@@ -88,8 +88,8 @@ class MessageUpdate(nn.Module):
 
         vectors = torch.cat([sites_s, sites_r, bonds], 2)
         
-        out1 = torch.zeros((vectors.shape[0], vectors.shape[1], self.out))
-        out2 = torch.zeros((vectors.shape[0], vectors.shape[1], self.out))
+        out1 = torch.zeros((vectors.shape[0], vectors.shape[1], self.out), device=vectors.device)
+        out2 = torch.zeros((vectors.shape[0], vectors.shape[1], self.out), device=vectors.device)
         
         for i in range(self.n_layers):
             mask = self.uc == i

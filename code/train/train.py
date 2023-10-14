@@ -21,6 +21,7 @@ from models.schnet import SchNet
 from models.dimenet import DimeNetPlusPlus as DimeNet
 from models.alignn import ALIGNN
 from models.matformer import Matformer
+from models.ecn import ECN
 
 from utils.ZeoliteData import get_zeolite, get_data_pore, get_data_graph, get_data_megnet
 from utils.dataloading import get_data, get_graph_data, get_graph_data_mat, get_graph_data_ecn
@@ -162,7 +163,7 @@ if __name__ == "__main__":
 
         elif args.model_type == 'ecn':
             idx1, idx2, edges, color = get_graph_data_ecn(X, A, l)
-            mpnn = ECN(idx1, idx2, color, 128,20,6*[128],128, width=2, centers=20)
+            mpnn = ECN(idx1.cuda(), idx2.cuda(), color.cuda(), 128,20,6*[128],128, width=2, centers=20).to('cuda')
             _, testloader, trainloader = get_data_graph(np.tile(atoms, (1,8)), hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
         print('starting fitting!')
 

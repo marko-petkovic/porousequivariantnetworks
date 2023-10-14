@@ -536,14 +536,14 @@ def get_graph_data_ecn(X, A, l):
     r, c = torch.tensor(edge_index)
     
     edge = (S[r] - S[c]).abs()
-    edge = np.where(edge>0.5, edge-1, edge)*l*2
+    edge = torch.where(edge>0.5, edge-1, edge)*l*2
     edge = (edge**2).sum(-1)**0.5
     unitcell = (S_u[r] - S_u[c]).abs()
     uniq = unitcell.unique(dim=0)
     comp = (unitcell[:,None] == uniq).all(-1)
     color = (comp*1).argmax(1)
 
-    return r, c, edge, color
+    return r, c, edge.unsqueeze(-1), color
     
 def get_graph_data(A, d):
     '''
