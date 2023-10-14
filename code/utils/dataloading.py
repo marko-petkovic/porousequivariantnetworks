@@ -523,7 +523,7 @@ def get_graph_data_ecn(X, A, l):
     
     S = torch.cat([torch.tensor(X+u) for u in uc])/2
     S_o = torch.cat([torch.tensor(X_o+u) for u in uc])/2
-    S_u = torch.vstack([torch.tensor(u) for u in uc]).repeat_interleave(48, 0)
+    S_u = torch.vstack([torch.tensor(u) for u in uc]).repeat_interleave(len(X), 0)
 
     # calculate edges
     d_O = (S[:,None] - S_o).abs()
