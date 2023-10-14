@@ -63,7 +63,7 @@ class MessageUpdate(nn.Module):
         self.out = out_features
         
         n_layers = len(uc.unique(dim=0))
-        
+        self.n_layers = n_layers
         # layer whcih processes the message and takes care of symmetries
         self.layer1 = nn.ModuleList([nn.Sequential(
             nn.Linear(2*in_features+bond_features, out_features),
@@ -77,6 +77,7 @@ class MessageUpdate(nn.Module):
         self.act = ACT()
         # attention layer (determines importance of message)
         self.attention1 = nn.Sequential(nn.Linear(out_features, 1), nn.Sigmoid())
+        self.attention2 = nn.Sequential(nn.Linear(out_features, 1), nn.Sigmoid())
         
     
             
@@ -87,20 +88,25 @@ class MessageUpdate(nn.Module):
 
         vectors = torch.cat([sites_s, sites_r, bonds], 2)
         
-        out = torch.zeros((vectors.shape[0], vectors.shape[1], self.out))
-
-        for i in range(len(self.layer)):
-            layer = self.layer[i]
-            mask = self.uc == i
-            out[:,mask] = layer(vectors[:,mask])
-
-        out = self.act(out)
-        lat_sites = self.attention1(out) * out
+        out1 = torch.zeros((vectors.shape[0], vectors.shape[1], self.out))
+        out2 = torch.zeros((vectors.shape[0], vectors.shape[1], self.out))
         
-        lat_sites = ts.scatter_add(lat_sites, self.idx2, 1)
+        for i in range(self.n_layers):
+            mask = self.uc == i
+            out1[:,mask] = self.layer1[i](vectors[:,mask])
+            out2[:,mask] = self.layer2[i](vectors[:,mask])
+
+        out1 = self.act(out1)
+        out2 = self.act(out2)
+        
+        lat_sites1 = self.attention1(out1) * out1
+        lat_sites2 = self.attention2(out2) * out2
+        
+        lat_sites1 = ts.scatter_add(lat_sites1, self.idx2, 1)
+        lat_sites2 = ts.scatter_add(lat_sites2, self.idx2, 1)
         # sites = self.message(sites, bonds, self.layer1, self.attention1)
         
-        return lat_sites
+        return lat_sites1 + lat_sites2
     
 
 class MessagePasser(nn.Module):
@@ -175,7 +181,7 @@ class PredictionLayer(nn.Module):
 
 class ECN(nn.Module):
     
-    def __init__(self, idx1, idx2, edges, uc,
+    def __init__(self, idx1, idx2, uc,
                  site_emb_size=16, edge_emb_size=12, hid_size=[16,16,32],
                  mlp_size=32, out_size=1, site_pred=False,
                  width=1, mx_d=10, mn_d=0, centers=10, virtual=False,

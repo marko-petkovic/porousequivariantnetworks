@@ -522,6 +522,7 @@ def get_graph_data_ecn(X, A, l):
     uc = list(product(range(2), range(2), range(2)))
     
     S = torch.cat([torch.tensor(X+u) for u in uc])/2
+    S_o = torch.cat([torch.tensor(X_o+u) for u in uc])/2
     S_u = torch.vstack([torch.tensor(u) for u in uc]).repeat_interleave(48, 0)
 
     # calculate edges
@@ -542,7 +543,7 @@ def get_graph_data_ecn(X, A, l):
     comp = (unitcell[:,None] == uniq).all(-1)
     color = (comp*1).argmax(1)
 
-    return torch.tensor(r), torch.tensor(c), torch.tensor(edge), color
+    return r, c, edge, color
     
 def get_graph_data(A, d):
     '''
