@@ -76,10 +76,10 @@ def get_colors(X, ref, tra):
     return colors, colors_idx
     
     
-def get_interaction_graph(d, A, X, ref, tra):
+def get_interaction_graph(d, A, X, ref, tra, cutoff):
     
-    # n_interactions = ((d <= cutoff)*(d>0)).sum()
-    n_interactions = int(A.sum())
+    n_interactions = ((d <= cutoff)*(d>0)).sum()
+    # n_interactions = int(A.sum())
     _, c_idx = get_colors(X, ref, tra)
 
     colors = torch.zeros((n_interactions,), dtype=int)
@@ -96,8 +96,8 @@ def get_interaction_graph(d, A, X, ref, tra):
         
         for j in range(A.shape[1]):
             
-            # if 0 < d[i,j] <= cutoff:
-            if A[i,j] == 1:  
+            if 0 < d[i,j] <= cutoff:
+            # if A[i,j] == 1:  
                 edge_index[cnt] = torch.tensor([i,j])
                 edge_weight[cnt] = d[i,j]
                 colors[cnt] = col
@@ -217,7 +217,7 @@ class EquiSchNet(nn.Module):
         
         self.readout = aggr_resolver('add')
         
-        edge_idx, edge_weight, colors = get_interaction_graph(d, A, X, ref, tra)
+        edge_idx, edge_weight, colors = get_interaction_graph(d, A, X, ref, tra, cutoff)
         
         self.edge_idx = edge_idx.cuda()
         self.edge_weight = edge_weight.cuda()
