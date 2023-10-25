@@ -25,7 +25,7 @@ from models.ecn import ECN
 from models.equivariant_schnet import EquiSchNet
 
 from utils.ZeoliteData import get_zeolite, get_data_pore, get_data_graph, get_data_megnet
-from utils.dataloading import get_data, get_graph_data, get_graph_data_mat, get_graph_data_ecn
+from utils.dataloading import get_data, get_graph_data, get_graph_data_mat, get_graph_data_ecn, get_distance_matrix
 
 import argparse
 
@@ -166,9 +166,8 @@ if __name__ == "__main__":
             idx1, idx2, edges, color = get_graph_data_ecn(X, A, l)
             mpnn = ECN(idx1.cuda(), idx2.cuda(), color.cuda(), 128,20,6*[128],128, width=2, centers=20).to('cuda')
             _, testloader, trainloader = get_data_graph(np.tile(atoms, (1,8)), hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
-        print('starting fitting!')
-
-        elif.args.model_type == 'esn':
+        
+        elif args.model_type == 'esn':
             edges_sp, idx1_sp, idx2_sp, idx2_oh_sp = get_graph_data(A_pore, d_pore)
             edges_ps, idx1_ps, idx2_ps, idx2_oh_ps = get_graph_data(A_pore.T, d_pore.T)
         
@@ -184,7 +183,8 @@ if __name__ == "__main__":
             mpnn = EquiSchNet(d, A_comb, X2, ref, tra).cuda()
             
         lr = 0.0005 if args.model_type == 'dime' else 0.001
-        
+        print('starting fitting!')
+
         trainloss, testloss = mpnn.fit(trainloader, testloader, args.epochs, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':lr}, crit_kwargs={'delta':1.0})
 
 
