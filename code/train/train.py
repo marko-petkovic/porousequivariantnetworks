@@ -22,6 +22,7 @@ from models.dimenet import DimeNetPlusPlus as DimeNet
 from models.alignn import ALIGNN
 from models.matformer import Matformer
 from models.ecn import ECN
+from models.equivariant_schnet import EquiSchNet
 
 from utils.ZeoliteData import get_zeolite, get_data_pore, get_data_graph, get_data_megnet
 from utils.dataloading import get_data, get_graph_data, get_graph_data_mat, get_graph_data_ecn
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
     #parser.add_argument('-n', '--name', type=str)
-    parser.add_argument('-m', '--model_type', choices=['pore', 'equi','megnet','cgcnn','schnet','dime','poreset', 'equiset', 'alignn','matformer','ecn'], type=str)
+    parser.add_argument('-m', '--model_type', choices=['pore', 'equi','megnet','cgcnn','schnet','dime','poreset', 'equiset', 'alignn','matformer','ecn','esn'], type=str)
     parser.add_argument('-z', '--zeolite', choices=['MOR', 'MFI'], type=str)
     parser.add_argument('-p', '--prop_train', type=float, default=1.0)
     parser.add_argument('-r', '--repetitions', type=int, default=1)
@@ -167,6 +168,21 @@ if __name__ == "__main__":
             _, testloader, trainloader = get_data_graph(np.tile(atoms, (1,8)), hoa, edges, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
         print('starting fitting!')
 
+        elif.args.model_type == 'esn':
+            edges_sp, idx1_sp, idx2_sp, idx2_oh_sp = get_graph_data(A_pore, d_pore)
+            edges_ps, idx1_ps, idx2_ps, idx2_oh_ps = get_graph_data(A_pore.T, d_pore.T)
+        
+            A_comb = np.zeros((len(X)+len(X_pore),len(X)+len(X_pore)))
+            A_comb[:len(X),:len(X)] = A
+            A_comb[:len(X), len(X):] = A_pore
+            A_comb[len(X):, :len(X)] = A_pore.T
+
+            _, testloader, trainloader = get_data_pore(atoms, hoa, edges, pore, edges_sp, edges_ps, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
+
+            X2 = np.concatenate((X,X_pore))
+            d = get_distance_matrix(X2, X2, l)
+            mpnn = EquiSchNet(d, A_comb, X2, ref, tra).cuda()
+            
         lr = 0.0005 if args.model_type == 'dime' else 0.001
         
         trainloss, testloss = mpnn.fit(trainloader, testloader, args.epochs, scale_loss=False, opt=optim.AdamW,opt_kwargs={'lr':lr}, crit_kwargs={'delta':1.0})
