@@ -240,13 +240,19 @@ class EquiSchNet(nn.Module):
     
     def forward(self, sites, sites_p):
 
+        m1 = sites.shape[1]
+        m2 = sites_p.shape[1]
+
+        
         h1 = self.embedding(sites)
         h2 = self.embedding_p(sites_p)
 
         h = torch.cat([h1,h2], 1)
         
         bs, at = h.shape[:2]
+
         
+        mask = torch.tensor(m1*[False]+m2*[True]).repeat(bs).cuda()
         batch = torch.arange(bs).repeat_interleave(at).cuda()
         
         batch_edge = (torch.arange(bs).repeat_interleave(self.edge_idx.shape[0])[:,None].repeat(1,2).cuda() * at).long()
@@ -268,7 +274,9 @@ class EquiSchNet(nn.Module):
         
         for interaction in self.interactions:
             h = h + interaction(h, edge_index, edge_weight, edge_attr, colors)
-            
+
+        h = h[mask]
+        batch = batch[mask]
         h = self.lin1(h)
         h - self.act(h)
         h = self.lin2(h)
