@@ -171,16 +171,16 @@ if __name__ == "__main__":
             edges_sp, idx1_sp, idx2_sp, idx2_oh_sp = get_graph_data(A_pore, d_pore)
             edges_ps, idx1_ps, idx2_ps, idx2_oh_ps = get_graph_data(A_pore.T, d_pore.T)
         
-            A_comb = np.zeros((len(X)+len(X_pore),len(X)+len(X_pore)))
-            A_comb[:len(X),:len(X)] = A
-            A_comb[:len(X), len(X):] = A_pore
-            A_comb[len(X):, :len(X)] = A_pore.T
+            # A_comb = np.zeros((len(X)+len(X_pore),len(X)+len(X_pore)))
+            # A_comb[:len(X),:len(X)] = A
+            # A_comb[:len(X), len(X):] = A_pore
+            # A_comb[len(X):, :len(X)] = A_pore.T
 
             _, testloader, trainloader = get_data_pore(atoms, hoa, edges, pore, edges_sp, edges_ps, bs=32, sub_lim=args.sub_lim, p=args.prop_train, random=args.random_split)
 
-            X2 = np.concatenate((X,X_pore))
-            d = get_distance_matrix(X2, X2, l)
-            mpnn = EquiSchNet(d, A_comb, X2, ref, tra).cuda()
+            # X2 = np.concatenate((X,X_pore))
+            # d = get_distance_matrix(X2, X2, l)
+            mpnn = EquiSchNet(d, d_pore, A, A_pore, X, X_pore, ref, tra).cuda()
             
         lr = 0.0005 if args.model_type == 'dime' else 0.001
         print('starting fitting!')
