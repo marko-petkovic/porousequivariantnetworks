@@ -204,7 +204,7 @@ class CFConv(MessagePassing):
 
 class EquiSchNet(nn.Module):
     
-    def __init__(self, d, A, X, ref, tra, hidden_channels=128, num_filters=128, num_interactions=6,
+    def __init__(self, d, d_pore, A, A_pore, X, X_pore, ref, tra, hidden_channels=128, num_filters=128, num_interactions=6,
                  num_gaussians=50, cutoff=10.0):
         
         super().__init__()
@@ -217,22 +217,44 @@ class EquiSchNet(nn.Module):
         
         self.readout = aggr_resolver('add')
         
-        edge_idx, edge_weight, colors = get_interaction_graph(d, A, X, ref, tra, cutoff)
+        edge_idx1, edge_weight1, colors1 = get_interaction_graph(d, A, X, ref, tra, cutoff)
+        edge_idx2, edge_weight2, colors2 = get_interaction_graph(d_pore, A_pore, X, ref, tra, cutoff)
+        edge_idx3, edge_weight3, colors3 = get_interaction_graph(d_pore.T, A_pore.T, X_pore, ref, tra, cutoff)
+
+
+        edge_idx2[:,1] += len(X)
+        edge_idx3[:,0] += len(X)
         
-        self.edge_idx = edge_idx.cuda()
-        self.edge_weight = edge_weight.cuda()
-        self.colors = colors.cuda()
+        self.edge_idx1 = edge_idx1.cuda()
+        self.edge_weight1 = edge_weight1.cuda()
+        self.colors1 = colors1.cuda()
+        
+        self.edge_idx2 = edge_idx2.cuda()
+        self.edge_weight2 = edge_weight2.cuda()
+        self.colors2 = colors2.cuda()
+                     
+        self.edge_idx3 = edge_idx3.cuda()
+        self.edge_weight3 = edge_weight3.cuda()
+        self.colors3 = colors3.cuda()
         
         self.embedding = EmbeddingLayer(1, hidden_channels)
         self.embedding_p = EmbeddingLayer(2, hidden_channels)
         
         self.distance_expansion = GaussianSmearing(0.0, cutoff, num_gaussians)
         
-        self.interactions = nn.ModuleList()
+        self.interactions1 = nn.ModuleList()
+        self.interactions2 = nn.ModuleList()
+        self.interactions3 = nn.ModuleList()
         for _ in range(num_interactions):
-            block = InteractionBlock(hidden_channels, num_gaussians,
-                                     num_filters, cutoff, self.colors)
-            self.interactions.append(block)
+            block1 = InteractionBlock(hidden_channels, num_gaussians,
+                                     num_filters, cutoff, self.colors1)
+            block2 = InteractionBlock(hidden_channels, num_gaussians,
+                                     num_filters, cutoff, self.colors2)
+            block3 = InteractionBlock(hidden_channels, num_gaussians,
+                                     num_filters, cutoff, self.colors3)
+            self.interactions1.append(block1)
+            self.interactions2.append(block2)
+            self.interactions3.append(block3)
             
         self.lin1 = nn.Linear(hidden_channels, hidden_channels // 2)
         self.act = ShiftedSoftplus()
@@ -255,26 +277,41 @@ class EquiSchNet(nn.Module):
         mask = torch.tensor(m1*[False]+m2*[True]).repeat(bs).cuda()
         batch = torch.arange(bs).repeat_interleave(at).cuda()
         
-        batch_edge = (torch.arange(bs).repeat_interleave(self.edge_idx.shape[0])[:,None].repeat(1,2).cuda() * at).long()
+        batch_edge1 = (torch.arange(bs).repeat_interleave(self.edge_idx1.shape[0])[:,None].repeat(1,2).cuda() * at).long()
+        batch_edge2 = (torch.arange(bs).repeat_interleave(self.edge_idx2.shape[0])[:,None].repeat(1,2).cuda() * at).long()
+        batch_edge3 = (torch.arange(bs).repeat_interleave(self.edge_idx3.shape[0])[:,None].repeat(1,2).cuda() * at).long()
 
 
-        colors = self.colors.clone()
-        colors = colors.repeat(bs)
+        colors1 = self.colors1.clone()
+        colors1 = colors1.repeat(bs)
+        colors2 = self.colors2.clone()
+        colors2 = colors2.repeat(bs)
+        colors3 = self.colors3.clone()
+        colors3 = colors3.repeat(bs)
         
         #print(bs, batch_edge.min(), batch_edge.max())
         
-        edge_weight = self.edge_weight.repeat(bs)
-        edge_index = (self.edge_idx.repeat(bs, 1) + batch_edge).T.long()
+        edge_weight1 = self.edge_weight1.repeat(bs)
+        edge_weight2 = self.edge_weight2.repeat(bs)
+        edge_weight3 = self.edge_weight3.repeat(bs)
         
+        edge_index1 = (self.edge_idx1.repeat(bs, 1) + batch_edge1).T.long()
+        edge_index2 = (self.edge_idx2.repeat(bs, 1) + batch_edge2).T.long()
+        edge_index3 = (self.edge_idx3.repeat(bs, 1) + batch_edge3).T.long()
         
         h = h.reshape(bs*at, -1)
         
         # h = self.embedding(sites)
-        edge_attr = self.distance_expansion(edge_weight)
+        edge_attr1 = self.distance_expansion(edge_weight1)
+        edge_attr2 = self.distance_expansion(edge_weight2)
+        edge_attr3 = self.distance_expansion(edge_weight3)
         
-        for interaction in self.interactions:
-            h = h + interaction(h, edge_index, edge_weight, edge_attr, colors)
-
+        for (i1,i2,i3) in zip(self.interactions1,self.interactions2,self.interactions3):
+            tt = i1(h, edge_index1, edge_weight1, edge_attr1, colors1)
+            tp = i2(h, edge_index2, edge_weight2, edge_attr2, colors2)
+            pt = i3(h, edge_index3, edge_weight3, edge_attr3, colors3)
+            h = h + tt + tp + pt
+            
         h = h[mask]
         batch = batch[mask]
         h = self.lin1(h)
