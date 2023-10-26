@@ -204,7 +204,7 @@ class CFConv(MessagePassing):
 
 class EquiSchNet(nn.Module):
     
-    def __init__(self, d, d_pore, A, A_pore, X, X_pore, ref, tra, hidden_channels=128, num_filters=128, num_interactions=6,
+    def __init__(self, d, d_pore, A, A_pore, X, X_pore, ref, tra, hidden_channels=64, num_filters=64, num_interactions=8,
                  num_gaussians=50, cutoff=10.0):
         
         super().__init__()
