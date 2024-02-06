@@ -6,6 +6,7 @@ new_model*
 /model_data/
 /model_data_random/
 model_data_random/
+Data_Isotherms/old/
 *.out
 /figures/
 
